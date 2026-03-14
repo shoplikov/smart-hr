@@ -3,6 +3,7 @@ import logging
 from openai import AsyncOpenAI
 
 from src.core.config import settings
+from src.core.prompt_manager import prompt_manager
 from src.models.llm_schemas import SmartEvaluationResult
 
 logger = logging.getLogger(__name__)
@@ -18,15 +19,11 @@ class SmartEvaluatorService:
     ) -> SmartEvaluationResult:
         logger.info(f"Evaluating goal via LLM: {title}")
 
-        system_prompt = (
-            "Вы — опытный HR-эксперт и бизнес-коуч. Ваша задача — оценить предложенную цель "
-            "сотрудника по методологии SMART (Specific, Measurable, Achievable, Relevant, Time-bound). "
-            "Будьте объективны, строги, но конструктивны. Всегда предлагайте варианты улучшения, "
-            "если критерий не выполнен. Отвечайте исключительно на русском языке."
+        system_prompt = prompt_manager.get_prompt("smart_evaluator", "system")
+        user_prompt = prompt_manager.get_prompt(
+            "smart_evaluator", "user", title=title, description=description
         )
-        user_prompt = f"Название цели: {title}\nОписание: {description}"
 
-        # Native structured output parsing guarantees matching the Pydantic schema
         response = await self.client.beta.chat.completions.parse(
             model=self.model,
             messages=[
