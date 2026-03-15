@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from typing import List
 
 import chromadb
@@ -8,7 +9,6 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import AsyncOpenAI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.config import settings
 from src.models.schema import Document
 
@@ -20,8 +20,13 @@ class RAGService:
         self.openai_client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.embedding_model = "text-embedding-3-small"
 
-        self.chroma_client = chromadb.PersistentClient(
-            path="./chroma_data", settings=Settings(anonymized_telemetry=False)
+        chroma_host = os.getenv("CHROMA_HOST", "localhost")
+        chroma_port = int(os.getenv("CHROMA_PORT", 8000))
+
+        self.chroma_client = chromadb.HttpClient(
+            host=chroma_host,
+            port=chroma_port,
+            settings=chromadb.config.Settings(anonymized_telemetry=False),
         )
 
         self.collection = self.chroma_client.get_or_create_collection(
