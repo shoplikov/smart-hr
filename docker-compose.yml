@@ -1,0 +1,44 @@
+services:
+  db:
+    image: postgres:17-alpine
+    container_name: hr_db
+    environment:
+      POSTGRES_USER: hr_user
+      POSTGRES_PASSWORD: hr_password
+      POSTGRES_DB: hr_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hr_backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://hr_user:hr_password@db:5432/hr_db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - db
+    volumes:
+      - ./backend/src:/app/src
+      - ./backend/prompts.yaml:/app/prompts.yaml
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hr_frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
