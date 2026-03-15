@@ -8,6 +8,7 @@ export const EmployeeView = () => {
     const [draftDescription, setDraftDescription] = useState('');
     const [evaluation, setEvaluation] = useState(null);
     const [evaluating, setEvaluating] = useState(false);
+    const [saving, setSaving] = useState(false);
 
     const handleEvaluate = async () => {
         if (!draftTitle || !draftDescription) return;
@@ -23,10 +24,34 @@ export const EmployeeView = () => {
         }
     };
 
+    const handleSaveGoal = async () => {
+        if (!draftTitle || !draftDescription) return;
+        setSaving(true);
+        try {
+            await api.createGoal({
+                title: draftTitle,
+                description: draftDescription,
+                quarter: 3,
+                year: 2026,
+                employee_id: 1
+            });
+            alert("Цель успешно сохранена и отправлена на проверку руководителю!");
+            
+            setDraftTitle('');
+            setDraftDescription('');
+            setEvaluation(null);
+        } catch (error) {
+            console.error(error);
+            alert("Ошибка при сохранении цели в базу данных");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     const handleApplySuggestion = (goal) => {
         setDraftTitle(goal.title);
         setDraftDescription(`${goal.description}\n\nМетрики:\n- ${goal.metrics.join('\n- ')}`);
-        setEvaluation(null); // Сбрасываем оценку при загрузке нового черновика
+        setEvaluation(null);
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
@@ -38,7 +63,6 @@ export const EmployeeView = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Левая колонка: Форма создания и оценки */}
                 <div>
                     <div className="bg-white shadow rounded-lg p-6 border border-gray-200">
                         <h2 className="text-xl font-bold mb-4">Новая цель</h2>
@@ -63,20 +87,30 @@ export const EmployeeView = () => {
                                     placeholder="Опишите цель максимально подробно..."
                                 />
                             </div>
-                            <button 
-                                onClick={handleEvaluate} 
-                                disabled={evaluating || !draftTitle || !draftDescription}
-                                className="w-full bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 disabled:opacity-50 transition font-medium"
-                            >
-                                {evaluating ? 'Анализ ИИ...' : 'Оценить по SMART'}
-                            </button>
+                            
+                            {/* Блок с кнопками */}
+                            <div className="flex space-x-3 pt-2">
+                                <button 
+                                    onClick={handleEvaluate} 
+                                    disabled={evaluating || saving || !draftTitle || !draftDescription}
+                                    className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 disabled:opacity-50 transition font-medium"
+                                >
+                                    {evaluating ? 'Анализ ИИ...' : 'Оценить по SMART'}
+                                </button>
+                                <button 
+                                    onClick={handleSaveGoal} 
+                                    disabled={evaluating || saving || !draftTitle || !draftDescription}
+                                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50 transition font-medium"
+                                >
+                                    {saving ? 'Сохранение...' : 'Отправить руководителю'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                     
                     <SmartScoreCard evaluation={evaluation} />
                 </div>
 
-                {/* Правая колонка: ИИ-помощник и RAG */}
                 <div>
                     <GoalSuggestions onSelectGoal={handleApplySuggestion} />
                 </div>

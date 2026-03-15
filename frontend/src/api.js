@@ -21,6 +21,16 @@ export const api = {
         return response.json();
     },
 
+    createGoal: async (payload) => {
+        const response = await fetch(`${API_BASE}/goals/`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Ошибка при сохранении цели');
+        return response.json();
+    },
+
     getEmployeeGoals: async (employeeId) => {
         const response = await fetch(`${API_BASE}/goals/employee/${employeeId}`);
         if (!response.ok) throw new Error('Ошибка при загрузке целей сотрудника');
@@ -33,4 +43,3 @@ export const api = {
         return response.json();
     }
 };
-
