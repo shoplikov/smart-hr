@@ -19,5 +19,18 @@ export const api = {
         });
         if (!response.ok) throw new Error('Ошибка при генерации целей');
         return response.json();
+    },
+
+    getEmployeeGoals: async (employeeId) => {
+        const response = await fetch(`${API_BASE}/goals/employee/${employeeId}`);
+        if (!response.ok) throw new Error('Ошибка при загрузке целей сотрудника');
+        return response.json();
+    },
+    
+    getDepartmentKpi: async (departmentId, kpiId) => {
+        const response = await fetch(`${API_BASE}/analytics/kpi/${departmentId}?kpi_id=${kpiId}`);
+        if (!response.ok) throw new Error('Ошибка при загрузке KPI');
+        return response.json();
     }
 };
+
