@@ -19,19 +19,15 @@ class PromptManager:
         with open(self.filepath, "r", encoding="utf-8") as f:
             return yaml.safe_load(f)
 
-    def get_prompt(self, service_name: str, role: str, **kwargs) -> str:
-        """
-        Example: get_prompt("smart_evaluator", "user", title="Sale", description="Increase sales")
-        """
+    def get_prompt(self, service_name: str, prompt_type: str, **kwargs) -> str:
         try:
-            template = self.prompts[service_name][role]
+            template = self.prompts[service_name][prompt_type]
             return template.format(**kwargs)
         except KeyError as e:
-            logger.error(f"Missing prompt configuration for {service_name}.{role}")
+            logger.error(f"Missing prompt configuration for {service_name}.{prompt_type}")
             raise KeyError(f"Prompt key missing: {e}")
         except KeyError as e:
             logger.error(f"Missing required format variable for prompt: {e}")
             raise ValueError(f"Missing variable for prompt formatting: {e}")
-
 
 prompt_manager = PromptManager()

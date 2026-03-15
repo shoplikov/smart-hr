@@ -3,7 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str
+    PROJECT_NAME: str = "HR AI Goal Management"
+
     DATABASE_URL: PostgresDsn
     OPENAI_API_KEY: str
 

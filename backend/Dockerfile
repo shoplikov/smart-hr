@@ -14,6 +14,10 @@ RUN uv pip install -r pyproject.toml
 
 COPY src/ ./src/
 COPY prompts.yaml ./
+COPY src/ ./src/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
+COPY prompts.yaml ./
 
 EXPOSE 8000
 
