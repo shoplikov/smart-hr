@@ -1,9 +1,8 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-
 from src.core.database import get_db
 from src.models.llm_schemas import GoalGenerationResult, SmartEvaluationResult
 from src.models.schema import Employee, Goal
@@ -12,6 +11,7 @@ from src.schemas.api import (
     GenerateGoalsRequest,
     GoalCreate,
     GoalResponse,
+    GoalStatusUpdate,
 )
 from src.services.goal_generator import goal_generator
 from src.services.smart_evaluator import smart_evaluator
@@ -68,3 +68,24 @@ async def generate_goals_smart(request: GenerateGoalsRequest):
     except Exception as e:
         logger.error(f"Error generating goals: {e}")
         raise HTTPException(status_code=500, detail="Ошибка при генерации целей AI")
+
+
+@router.patch("/{goal_id}/status", response_model=GoalResponse)
+async def update_goal_status(
+    goal_id: int, status_update: GoalStatusUpdate, db: AsyncSession = Depends(get_db)
+):
+    """Обновление целей hr-ом"""
+    query = (
+        update(Goal)
+        .where(Goal.id == goal_id)
+        .values(status=status_update.status)
+        .returning(Goal)
+    )
+    result = await db.execute(query)
+    updated_goal = result.scalars().first()
+
+    if not updated_goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    await db.commit()
+    return updated_goal

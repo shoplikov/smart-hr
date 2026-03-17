@@ -23,7 +23,11 @@ class GoalResponse(GoalBase):
     model_config = {"from_attributes": True}
 
 
-# AI Schemas 
+class GoalStatusUpdate(BaseModel):
+    status: str
+
+
+# AI Schemas
 class EvaluateGoalRequest(BaseModel):
     title: str = Field(..., description="Название цели для оценки")
     description: str = Field(..., description="Описание цели для оценки")
@@ -38,7 +42,7 @@ class GenerateGoalsRequest(BaseModel):
     year: int = Field(..., ge=2020)
 
 
-# Analytics Schemas 
+# Analytics Schemas
 class KpiDataPoint(BaseModel):
     period: str
     value: float

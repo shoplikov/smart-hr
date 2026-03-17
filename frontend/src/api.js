@@ -41,5 +41,21 @@ export const api = {
         const response = await fetch(`${API_BASE}/analytics/kpi/${departmentId}?kpi_id=${kpiId}`);
         if (!response.ok) throw new Error('Ошибка при загрузке KPI');
         return response.json();
-    }
+    },
+
+    getEmployeeGoals: async (employeeId) => {
+        const response = await fetch(`${API_BASE}/goals/employee/${employeeId}`);
+        if (!response.ok) throw new Error('Ошибка при загрузке целей сотрудника');
+        return response.json();
+    },
+    
+    updateGoalStatus: async (goalId, status) => {
+        const response = await fetch(`${API_BASE}/goals/${goalId}/status`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status })
+        });
+        if (!response.ok) throw new Error('Ошибка при обновлении статуса');
+        return response.json();
+    },
 };
