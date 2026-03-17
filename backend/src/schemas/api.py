@@ -55,3 +55,14 @@ class KpiDataPoint(BaseModel):
     value: float
 
     model_config = {"from_attributes": True}
+
+
+class ChartDataPoint(BaseModel):
+    name: str
+    value: float
+
+
+class DashboardResponse(BaseModel):
+    kpi_name: str
+    unit: str
+    data: list[ChartDataPoint]
