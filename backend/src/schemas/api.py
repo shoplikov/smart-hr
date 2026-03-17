@@ -1,4 +1,4 @@
-from typing import List
+from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -25,6 +25,13 @@ class GoalResponse(GoalBase):
 
 class GoalStatusUpdate(BaseModel):
     status: str
+
+
+class GoalUpdate(BaseModel):
+    title: str
+    description: str
+    quarter: Optional[int] = None
+    year: Optional[int] = None
 
 
 # AI Schemas

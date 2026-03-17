@@ -10,11 +10,12 @@ export const EmployeeView = () => {
     const [evaluating, setEvaluating] = useState(false);
     const [saving, setSaving] = useState(false);
     
-    // Хранение списка отправленных целей
     const [myGoals, setMyGoals] = useState([]);
     const [loadingGoals, setLoadingGoals] = useState(true);
+    
+    // ID цели, которую мы сейчас редактируем
+    const [editingGoalId, setEditingGoalId] = useState(null);
 
-    // ЗАГРУЗКА ЦЕЛЕЙ ПРИ СТАРТЕ
     useEffect(() => {
         fetchMyGoals();
     }, []);
@@ -22,8 +23,7 @@ export const EmployeeView = () => {
     const fetchMyGoals = async () => {
         setLoadingGoals(true);
         try {
-            const goals = await api.getEmployeeGoals(1); // Хардкод ID 1 для демо
-            // Сортируем так, чтобы новые/черновики были сверху
+            const goals = await api.getEmployeeGoals(1);
             const sortedGoals = goals.sort((a, b) => a.status === 'DRAFT' ? -1 : 1);
             setMyGoals(sortedGoals);
         } catch (error) {
@@ -51,29 +51,62 @@ export const EmployeeView = () => {
         if (!draftTitle || !draftDescription) return;
         setSaving(true);
         try {
-            await api.createGoal({
+            const payload = {
                 title: draftTitle,
                 description: draftDescription,
                 quarter: 3,
                 year: 2026,
-                employee_id: 1 // Хардкод ID 1
-            });
-            alert("Цель успешно сохранена и отправлена на проверку руководителю!");
+                employee_id: 1 
+            };
+
+            // Логика ветвления: Обновляем существующую или создаем новую
+            if (editingGoalId) {
+                await api.updateGoal(editingGoalId, payload);
+                alert("✅ Цель успешно обновлена!");
+            } else {
+                await api.createGoal(payload);
+                alert("✅ Цель успешно сохранена и отправлена на проверку руководителю!");
+            }
             
-            // Очищаем форму
-            setDraftTitle('');
-            setDraftDescription('');
-            setEvaluation(null);
-
-            // ОБНОВЛЯЕМ СПИСОК ЦЕЛЕЙ СРАЗУ ПОСЛЕ СОХРАНЕНИЯ
+            resetForm();
             await fetchMyGoals();
-
         } catch (error) {
             console.error(error);
             alert("Ошибка при сохранении цели в базу данных");
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleEditClick = (goal) => {
+        setEditingGoalId(goal.id);
+        setDraftTitle(goal.title);
+        setDraftDescription(goal.description);
+        setEvaluation(null);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    const handleDeleteClick = async (goalId) => {
+        if (!window.confirm("Вы уверены, что хотите удалить эту цель?")) return;
+        try {
+            await api.deleteGoal(goalId);
+            await fetchMyGoals();
+            
+            // Если мы удалили цель, которую сейчас редактируем, очищаем форму
+            if (editingGoalId === goalId) {
+                resetForm();
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Не удалось удалить цель.");
+        }
+    };
+
+    const resetForm = () => {
+        setEditingGoalId(null);
+        setDraftTitle('');
+        setDraftDescription('');
+        setEvaluation(null);
     };
 
     const handleApplySuggestion = (goal) => {
@@ -92,9 +125,13 @@ export const EmployeeView = () => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
                 <div>
-                    {/* Форма создания цели */}
-                    <div className="bg-white shadow rounded-lg p-6 border border-gray-200">
-                        <h2 className="text-xl font-bold mb-4">Новая цель</h2>
+                    <div className="bg-white shadow rounded-lg p-6 border border-gray-200 relative">
+                        {editingGoalId && (
+                            <div className="absolute top-0 right-0 bg-yellow-100 text-yellow-800 px-3 py-1 text-xs font-bold rounded-bl-lg rounded-tr-lg">
+                                РЕЖИМ РЕДАКТИРОВАНИЯ
+                            </div>
+                        )}
+                        <h2 className="text-xl font-bold mb-4">{editingGoalId ? 'Редактирование цели' : 'Новая цель'}</h2>
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700">Название цели</label>
@@ -103,7 +140,6 @@ export const EmployeeView = () => {
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" 
                                     value={draftTitle} 
                                     onChange={e => setDraftTitle(e.target.value)} 
-                                    placeholder="Например: Увеличить покрытие тестами"
                                 />
                             </div>
                             <div>
@@ -113,7 +149,6 @@ export const EmployeeView = () => {
                                     className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500" 
                                     value={draftDescription} 
                                     onChange={e => setDraftDescription(e.target.value)}
-                                    placeholder="Опишите цель максимально подробно..."
                                 />
                             </div>
                             
@@ -130,8 +165,16 @@ export const EmployeeView = () => {
                                     disabled={evaluating || saving || !draftTitle || !draftDescription}
                                     className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50 transition font-medium"
                                 >
-                                    {saving ? 'Сохранение...' : 'Отправить руководителю'}
+                                    {saving ? 'Сохранение...' : (editingGoalId ? 'Сохранить изменения' : 'Отправить руководителю')}
                                 </button>
+                                {editingGoalId && (
+                                    <button 
+                                        onClick={resetForm}
+                                        className="bg-gray-200 text-gray-700 py-2 px-4 rounded hover:bg-gray-300 transition font-medium"
+                                    >
+                                        Отмена
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -146,7 +189,6 @@ export const EmployeeView = () => {
                 </div>
             </div>
 
-            {/* СПИСОК ЦЕЛЕЙ СОТРУДНИКА */}
             <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden mt-8">
                 <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
                     <h3 className="text-lg leading-6 font-medium text-gray-900">Мои отправленные цели</h3>
@@ -171,6 +213,24 @@ export const EmployeeView = () => {
                                             </span>
                                         </div>
                                     </div>
+                                    
+                                    {/* Кнопки отображаются ТОЛЬКО если статус DRAFT */}
+                                    {goal.status === 'DRAFT' && (
+                                        <div className="flex space-x-3 ml-4">
+                                            <button 
+                                                onClick={() => handleEditClick(goal)}
+                                                className="text-sm font-medium text-blue-600 hover:text-blue-800 transition"
+                                            >
+                                                Редактировать
+                                            </button>
+                                            <button 
+                                                onClick={() => handleDeleteClick(goal.id)}
+                                                className="text-sm font-medium text-red-600 hover:text-red-800 transition"
+                                            >
+                                                Удалить
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </li>
                         ))}

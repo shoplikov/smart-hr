@@ -12,6 +12,7 @@ from src.schemas.api import (
     GoalCreate,
     GoalResponse,
     GoalStatusUpdate,
+    GoalUpdate
 )
 from src.services.goal_generator import goal_generator
 from src.services.smart_evaluator import smart_evaluator
@@ -89,3 +90,50 @@ async def update_goal_status(
 
     await db.commit()
     return updated_goal
+
+
+@router.put("/{goal_id}", response_model=GoalResponse)
+async def update_goal(
+    goal_id: int, goal_update: GoalUpdate, db: AsyncSession = Depends(get_db)
+):
+    """Updates a draft goal. Fails if already approved."""
+    query = select(Goal).where(Goal.id == goal_id)
+    result = await db.execute(query)
+    goal = result.scalars().first()
+
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if goal.status != "DRAFT":
+        raise HTTPException(
+            status_code=400, detail="Cannot edit an approved goal. It is locked."
+        )
+
+    goal.title = goal_update.title
+    goal.description = goal_update.description
+    if goal_update.quarter:
+        goal.quarter = goal_update.quarter
+    if goal_update.year:
+        goal.year = goal_update.year
+
+    await db.commit()
+    await db.refresh(goal)
+    return goal
+
+
+@router.delete("/{goal_id}", status_code=204)
+async def delete_goal(goal_id: int, db: AsyncSession = Depends(get_db)):
+    """Deletes a draft goal. Fails if already approved."""
+    query = select(Goal).where(Goal.id == goal_id)
+    result = await db.execute(query)
+    goal = result.scalars().first()
+
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+    if goal.status != "DRAFT":
+        raise HTTPException(
+            status_code=400, detail="Cannot delete an approved goal. It is locked."
+        )
+
+    await db.delete(goal)
+    await db.commit()
+    return None

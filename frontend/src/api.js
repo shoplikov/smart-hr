@@ -58,4 +58,22 @@ export const api = {
         if (!response.ok) throw new Error('Ошибка при обновлении статуса');
         return response.json();
     },
+
+    updateGoal: async (goalId, payload) => {
+        const response = await fetch(`${API_BASE}/goals/${goalId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Ошибка при обновлении цели');
+        return response.json();
+    },
+
+    deleteGoal: async (goalId) => {
+        const response = await fetch(`${API_BASE}/goals/${goalId}`, {
+            method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Ошибка при удалении цели');
+        return true;
+    },
 };
