@@ -22,12 +22,14 @@ class PromptManager:
     def get_prompt(self, service_name: str, prompt_type: str, **kwargs) -> str:
         try:
             template = self.prompts[service_name][prompt_type]
-            return template.format(**kwargs)
         except KeyError as e:
             logger.error(f"Missing prompt configuration for {service_name}.{prompt_type}")
-            raise KeyError(f"Prompt key missing: {e}")
+            raise KeyError(f"Prompt key missing: {e}") from e
+
+        try:
+            return template.format(**kwargs)
         except KeyError as e:
             logger.error(f"Missing required format variable for prompt: {e}")
-            raise ValueError(f"Missing variable for prompt formatting: {e}")
+            raise ValueError(f"Missing variable for prompt formatting: {e}") from e
 
 prompt_manager = PromptManager()

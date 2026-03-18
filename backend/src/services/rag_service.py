@@ -1,14 +1,15 @@
 import asyncio
+import json
 import logging
 import os
 from typing import List
 
 import chromadb
-from chromadb.config import Settings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import AsyncOpenAI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.core.config import settings
 from src.models.schema import Document
 
@@ -44,7 +45,7 @@ class RAGService:
         return [data.embedding for data in sorted(response.data, key=lambda x: x.index)]
 
     async def ingest_documents(self, db_session: AsyncSession) -> None:
-        logger.info("Starting RAG document ingestion via OpenAI..")
+        logger.info("Starting RAG document ingestion via OpenAI...")
 
         result = await db_session.execute(select(Document))
         documents = result.scalars().all()
@@ -62,12 +63,12 @@ class RAGService:
                 ids.append(f"doc_{doc.doc_id}_chunk_{i}")
                 metadatas.append(
                     {
-                        "doc_id": doc.doc_id,
+                        "doc_id": str(doc.doc_id),
                         "title": doc.title,
-                        "department_scope": doc.department_scope or "all",
-                        "doc_type": doc.doc_type,
+                        "doc_type": doc.doc_type.value if doc.doc_type else "other",
                     }
                 )
+
         batch_size = 1000
         all_embeddings = []
         for i in range(0, len(texts), batch_size):
@@ -89,20 +90,10 @@ class RAGService:
     ) -> str:
         query_embedding = await self._generate_embeddings([query])
 
-        where_clause = None
-        if department_scope:
-            where_clause = {
-                "$or": [
-                    {"department_scope": department_scope},
-                    {"department_scope": "all"},
-                ]
-            }
-
         results = await asyncio.to_thread(
             self.collection.query,
             query_embeddings=query_embedding,
             n_results=top_k,
-            where=where_clause,
         )
 
         if not results["documents"] or not results["documents"][0]:

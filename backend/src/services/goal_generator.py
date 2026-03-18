@@ -1,5 +1,4 @@
 import logging
-
 from openai import AsyncOpenAI
 
 from src.core.config import settings
@@ -13,7 +12,9 @@ logger = logging.getLogger(__name__)
 class GoalGeneratorService:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = "gpt-4o"
+        self.model = (
+            "gpt-4o"
+        )
 
     async def generate_goals(
         self, role: str, department: str, quarter: int, year: int
@@ -21,6 +22,7 @@ class GoalGeneratorService:
         logger.info(f"Generating goals for {role} in {department} (Q{quarter} {year})")
 
         search_query = f"Стратегические цели, приоритеты и OKR для {department} на {quarter} квартал {year} года. Роль: {role}"
+
         context = await rag_service.search_relevant_context(
             query=search_query, department_scope=department, top_k=3
         )

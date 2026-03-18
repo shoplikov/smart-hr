@@ -1,14 +1,34 @@
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
+from src.core.database import AsyncSessionLocal
 from src.routers import analytics, goals
+from src.services.rag_service import rag_service
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    try:
+        if rag_service.collection.count() == 0:
+            logger.info("ChromaDB collection is empty — starting document ingestion...")
+            async with AsyncSessionLocal() as session:
+                await rag_service.ingest_documents(session)
+        else:
+            logger.info(
+                f"ChromaDB already has {rag_service.collection.count()} chunks, skipping ingestion."
+            )
+    except Exception as e:
+        logger.error(f"RAG ingestion failed on startup: {e}")
+    yield
 
 
 def create_app() -> FastAPI:
@@ -18,9 +38,9 @@ def create_app() -> FastAPI:
         version="0.1.0",
         docs_url="/api/docs",
         redoc_url="/api/redoc",
+        lifespan=lifespan,
     )
 
-    # CORS for frontend
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

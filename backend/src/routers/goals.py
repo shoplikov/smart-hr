@@ -1,49 +1,49 @@
 import uuid
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from src.core.database import get_db
 from src.models.schema import Goal, GoalStatusEnum, QuarterEnum
+from src.schemas.api import (
+    GoalCreate,
+    GoalEvaluateRequest,
+    GoalGenerateRequest,
+    GoalResponse,
+    GoalStatusUpdate,
+    GoalUpdate,
+)
+from src.services.goal_generator import goal_generator
+from src.services.smart_evaluator import smart_evaluator
 
 router = APIRouter(prefix="/api/v1/goals", tags=["Goals"])
 
 
-# --- Pydantic Schemas ---
-class GoalCreate(BaseModel):
-    title: str
-    description: str
-    quarter: int
-    year: int
-    employee_id: int
-    department_id: int = 1  # Default to 1 for the demo
+# --- AI Endpoints ---
+@router.post("/ai/generate")
+async def generate_goals(request: GoalGenerateRequest):
+    """Generates suggested goals using the RAG Service and OpenAI."""
+    result = await goal_generator.generate_goals(
+        role=request.role,
+        department=request.department,
+        quarter=request.quarter,
+        year=request.year,
+    )
+    return result
 
 
-class GoalUpdate(BaseModel):
-    title: str
-    description: str
+@router.post("/ai/evaluate")
+async def evaluate_goal_endpoint(request: GoalEvaluateRequest):
+    """Evaluates a goal against SMART criteria using OpenAI."""
+    result = await smart_evaluator.evaluate_goal(
+        title=request.title, description=request.description
+    )
+    return result
 
 
-class GoalStatusUpdate(BaseModel):
-    status: str
-
-
-class GoalResponse(BaseModel):
-    id: str  # React expects a string, DB uses UUID
-    title: str
-    description: str
-    quarter: int
-    year: int
-    employee_id: int
-    status: str
-
-    class Config:
-        from_attributes = True
-
-
-# --- Endpoints ---
+# --- Database Endpoints ---
 @router.post("/", response_model=GoalResponse)
 async def create_goal(goal: GoalCreate, db: AsyncSession = Depends(get_db)):
     q_enum = getattr(QuarterEnum, f"Q{goal.quarter}", QuarterEnum.Q1)
@@ -51,8 +51,8 @@ async def create_goal(goal: GoalCreate, db: AsyncSession = Depends(get_db)):
     new_goal = Goal(
         employee_id=goal.employee_id,
         department_id=goal.department_id,
-        goal_text=goal.title,  # Translate title -> goal_text
-        metric=goal.description,  # Translate description -> metric
+        goal_text=goal.title,
+        metric=goal.description,
         quarter=q_enum,
         year=goal.year,
         status=GoalStatusEnum.draft,

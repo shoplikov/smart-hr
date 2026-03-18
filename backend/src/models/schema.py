@@ -4,7 +4,6 @@ from datetime import date, datetime
 
 from sqlalchemy import (
     Boolean,
-    CheckConstraint,
     Column,
     Date,
     DateTime,
@@ -12,13 +11,10 @@ from sqlalchemy import (
     Integer,
     Numeric,
     SmallInteger,
-    String,
     Text,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
-from sqlalchemy.orm import declarative_base, relationship
-
-Base = declarative_base()
+from src.models.base import Base
 
 
 # --- ENUMS ---
@@ -110,6 +106,32 @@ class Employee(Base):
     is_active = Column(Boolean, default=True, nullable=False)
 
 
+class Document(Base):
+    __tablename__ = "documents"
+    doc_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    doc_type = Column(ENUM(DocTypeEnum, create_type=False), nullable=False)
+    title = Column(Text, nullable=False)
+    content = Column(Text, nullable=False)
+    valid_from = Column(Date, nullable=False)
+    valid_to = Column(Date)
+    owner_department_id = Column(
+        Integer, ForeignKey("departments.id", ondelete="SET NULL")
+    )
+    department_scope = Column(JSONB)
+    keywords = Column(ARRAY(Text))
+    version = Column(Text)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
 class Goal(Base):
     __tablename__ = "goals"
     goal_id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -121,12 +143,14 @@ class Goal(Base):
     )
     goal_text = Column(Text, nullable=False)
     year = Column(SmallInteger, nullable=False)
-    quarter = Column(ENUM(QuarterEnum, create_type=False), nullable=False)
+    quarter = Column(
+        ENUM(QuarterEnum, name="quarter_enum", create_type=False), nullable=False
+    )
     metric = Column(Text)
     deadline = Column(Date)
     weight = Column(Numeric(5, 2), default=1.00, nullable=False)
     status = Column(
-        ENUM(GoalStatusEnum, create_type=False),
+        ENUM(GoalStatusEnum, name="goal_status_enum", create_type=False),
         default=GoalStatusEnum.draft,
         nullable=False,
     )

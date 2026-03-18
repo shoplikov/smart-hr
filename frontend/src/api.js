@@ -42,12 +42,7 @@ export const api = {
         if (!response.ok) throw new Error('Ошибка при загрузке KPI');
         return response.json();
     },
-    getEmployeeGoals: async (employeeId) => {
-        const response = await fetch(`${API_BASE}/goals/employee/${employeeId}`);
-        if (!response.ok) throw new Error('Ошибка при загрузке целей сотрудника');
-        return response.json();
-    },
-    
+
     updateGoalStatus: async (goalId, status) => {
         const response = await fetch(`${API_BASE}/goals/${goalId}/status`, {
             method: 'PATCH',

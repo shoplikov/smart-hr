@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Dashboard } from '../components/Dashboard';
+import { SmartScoreCard } from '../components/SmartScoreCard';
 import { api } from '../api';
 
 export const ManagerView = () => {
     const [teamGoals, setTeamGoals] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [evaluatingGoalId, setEvaluatingGoalId] = useState(null);
+    const [evaluationResults, setEvaluationResults] = useState({});
 
     useEffect(() => {
         fetchTeamGoals();
@@ -12,9 +15,7 @@ export const ManagerView = () => {
 
     const fetchTeamGoals = async () => {
         try {
-            // Запрашиваем цели сотрудника с ID 1 (Алексей)
             const data = await api.getEmployeeGoals(1);
-            // Сортируем: сначала DRAFT (ожидают проверки), потом APPROVED
             const sortedData = data.sort((a, b) => a.status === 'DRAFT' ? -1 : 1);
             setTeamGoals(sortedData);
         } catch (error) {
@@ -24,13 +25,9 @@ export const ManagerView = () => {
         }
     };
 
-    //Одобрение цели
     const handleApprove = async (goalId) => {
         try {
-            // Отправляем запрос на бэкенд
             await api.updateGoalStatus(goalId, 'APPROVED');
-            
-            // Оптимистично обновляем UI
             setTeamGoals(prevGoals => 
                 prevGoals.map(goal => 
                     goal.id === goalId ? { ...goal, status: 'APPROVED' } : goal
@@ -42,16 +39,24 @@ export const ManagerView = () => {
         }
     };
 
+    const handleEvaluate = async (goal) => {
+        setEvaluatingGoalId(goal.id);
+        try {
+            const result = await api.evaluateGoal(goal.title, goal.description);
+            setEvaluationResults(prev => ({ ...prev, [goal.id]: result }));
+        } catch (error) {
+            console.error("Failed to evaluate goal", error);
+            alert("Ошибка при вызове AI-оценщика.");
+        } finally {
+            setEvaluatingGoalId(null);
+        }
+    };
+
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-screen">
-            <div className="mb-8 flex justify-between items-end">
-                <div>
-                    <h1 className="text-3xl font-extrabold text-gray-900">Кабинет руководителя</h1>
-                    <p className="mt-2 text-sm text-gray-600">Аналитика отдела и ревью целей команды</p>
-                </div>
-                <button className="bg-white border border-gray-300 text-gray-700 py-2 px-4 rounded shadow-sm hover:bg-gray-50 transition font-medium">
-                    Экспорт отчета (PDF)
-                </button>
+            <div className="mb-8">
+                <h1 className="text-3xl font-extrabold text-gray-900">Кабинет руководителя</h1>
+                <p className="mt-2 text-sm text-gray-600">Аналитика отдела и ревью целей команды</p>
             </div>
 
             <Dashboard />
@@ -82,21 +87,30 @@ export const ManagerView = () => {
                                         </div>
                                     </div>
                                     
-                                    {/* Показываем кнопки только если статус DRAFT */}
                                     {goal.status === 'DRAFT' && (
                                         <div className="flex flex-col space-y-2 ml-4">
-                                            <button className="text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 py-2 px-4 rounded transition">
-                                                Анализ ИИ
+                                            <button
+                                                onClick={() => handleEvaluate(goal)}
+                                                disabled={evaluatingGoalId === goal.id}
+                                                className="text-sm font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 py-2 px-4 rounded transition disabled:opacity-50"
+                                            >
+                                                {evaluatingGoalId === goal.id ? 'Анализ...' : 'Анализ ИИ'}
                                             </button>
                                             <button 
                                                 onClick={() => handleApprove(goal.id)}
                                                 className="text-sm font-medium text-white bg-green-600 hover:bg-green-700 py-2 px-4 rounded transition shadow-sm"
                                             >
-                                                ✓ Утвердить
+                                                Утвердить
                                             </button>
                                         </div>
                                     )}
                                 </div>
+
+                                {evaluationResults[goal.id] && (
+                                    <div className="mt-4">
+                                        <SmartScoreCard evaluation={evaluationResults[goal.id]} />
+                                    </div>
+                                )}
                             </li>
                         ))}
                         {teamGoals.length === 0 && (
