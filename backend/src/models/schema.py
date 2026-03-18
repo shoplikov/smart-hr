@@ -12,6 +12,7 @@ from sqlalchemy import (
     Numeric,
     SmallInteger,
     Text,
+    func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
 from src.models.base import Base
@@ -179,6 +180,19 @@ class Goal(Base):
         onupdate=datetime.utcnow,
         nullable=False,
     )
+
+
+class GoalEvaluation(Base):
+    __tablename__ = "goal_evaluations"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    goal_id = Column(
+        UUID(as_uuid=True), ForeignKey("goals.goal_id", ondelete="CASCADE"), nullable=False
+    )
+    smart_index = Column(Numeric(4, 3))
+    smart_scores = Column(JSONB)
+    recommendations = Column(JSONB)
+    improved_goal = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 
 class GoalReview(Base):

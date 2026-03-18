@@ -105,4 +105,20 @@ export const api = {
         if (!response.ok) throw new Error('Ошибка при загрузке ревью');
         return response.json();
     },
+
+    runAndSaveEvaluation: async (goalId) => {
+        const response = await fetch(`${API_BASE}/goals/${goalId}/evaluations`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+        });
+        if (!response.ok) throw new Error('Ошибка при запуске AI-оценки');
+        return response.json();
+    },
+
+    getLatestEvaluation: async (goalId) => {
+        const response = await fetch(`${API_BASE}/goals/${goalId}/evaluations/latest`);
+        if (response.status === 404) return null;
+        if (!response.ok) throw new Error('Ошибка при загрузке оценки');
+        return response.json();
+    },
 };

@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
 from src.models.schema import (
     Goal,
+    GoalEvaluation,
     GoalEvent,
     GoalEventTypeEnum,
     GoalReview,
@@ -139,6 +140,69 @@ async def batch_evaluate_goals(
             {"criterion": k, "avg_score": v} for k, v in weakest if v < 0.7
         ],
         "evaluations": individual,
+    }
+
+
+# --- Evaluation Persistence Endpoints ---
+@router.post("/{goal_id}/evaluations")
+async def create_evaluation(
+    goal_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    goal = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
+    if not goal:
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    result = await smart_evaluator.evaluate_goal(goal_text=goal.goal_text)
+    scores_dict = result.smart_scores.model_dump() if result.smart_scores else {}
+
+    evaluation = GoalEvaluation(
+        goal_id=goal_id,
+        smart_index=result.smart_index,
+        smart_scores=scores_dict,
+        recommendations=result.recommendations,
+        improved_goal=result.improved_goal,
+    )
+    db.add(evaluation)
+    await db.commit()
+    await db.refresh(evaluation)
+
+    return {
+        "id": str(evaluation.id),
+        "goal_id": str(goal_id),
+        "smart_index": float(evaluation.smart_index) if evaluation.smart_index else 0,
+        "smart_scores": evaluation.smart_scores,
+        "recommendations": evaluation.recommendations,
+        "improved_goal": evaluation.improved_goal,
+        "created_at": evaluation.created_at.isoformat() if evaluation.created_at else None,
+    }
+
+
+@router.get("/{goal_id}/evaluations/latest")
+async def get_latest_evaluation(
+    goal_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    query = (
+        select(GoalEvaluation)
+        .where(GoalEvaluation.goal_id == goal_id)
+        .order_by(GoalEvaluation.created_at.desc())
+        .limit(1)
+    )
+    result = await db.execute(query)
+    evaluation = result.scalars().first()
+
+    if not evaluation:
+        raise HTTPException(status_code=404, detail="No evaluation found")
+
+    return {
+        "id": str(evaluation.id),
+        "goal_id": str(goal_id),
+        "smart_index": float(evaluation.smart_index) if evaluation.smart_index else 0,
+        "smart_scores": evaluation.smart_scores,
+        "recommendations": evaluation.recommendations,
+        "improved_goal": evaluation.improved_goal,
+        "created_at": evaluation.created_at.isoformat() if evaluation.created_at else None,
     }
 
 

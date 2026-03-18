@@ -13,7 +13,7 @@ class GoalGeneratorService:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = (
-            "gpt-4o"
+            "gpt-4o-mini"
         )
 
     async def generate_goals(

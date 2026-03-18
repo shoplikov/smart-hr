@@ -1,33 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { SmartScoreCard } from '../components/SmartScoreCard';
 import { GoalSuggestions } from '../components/GoalSuggestions';
+import { GoalCard } from '../components/GoalCard';
+import { GoalCardSkeleton } from '../components/shared';
 import { api } from '../api';
 import { useUser } from '../UserContext';
-
-const LOCKED_STATUSES = ['APPROVED', 'DONE', 'ARCHIVED'];
-
-const STATUS_CONFIG = {
-    DRAFT:       { label: 'Черновик',        bg: 'bg-gray-100',   text: 'text-gray-700' },
-    SUBMITTED:   { label: 'На рассмотрении', bg: 'bg-yellow-100', text: 'text-yellow-800' },
-    IN_PROGRESS: { label: 'В работе',        bg: 'bg-blue-100',   text: 'text-blue-800' },
-    ACTIVE:      { label: 'Активна',         bg: 'bg-blue-100',   text: 'text-blue-800' },
-    APPROVED:    { label: 'Утверждено',       bg: 'bg-green-100',  text: 'text-green-800' },
-    DONE:        { label: 'Выполнено',        bg: 'bg-emerald-100',text: 'text-emerald-800' },
-    CANCELLED:   { label: 'Отменено',         bg: 'bg-red-100',    text: 'text-red-700' },
-    OVERDUE:     { label: 'Просрочено',       bg: 'bg-red-100',    text: 'text-red-700' },
-    ARCHIVED:    { label: 'В архиве',         bg: 'bg-gray-100',   text: 'text-gray-500' },
-    NEEDS_CHANGES: { label: 'На доработке',   bg: 'bg-orange-100', text: 'text-orange-700' },
-    REJECTED:    { label: 'Отклонено',        bg: 'bg-red-100',    text: 'text-red-700' },
-};
-
-const GoalStatusBadge = ({ status }) => {
-    const cfg = STATUS_CONFIG[status] || { label: status, bg: 'bg-gray-100', text: 'text-gray-700' };
-    return (
-        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${cfg.bg} ${cfg.text}`}>
-            {cfg.label}
-        </span>
-    );
-};
 
 export const EmployeeView = () => {
     const user = useUser();
@@ -39,9 +16,7 @@ export const EmployeeView = () => {
 
     const [myGoals, setMyGoals] = useState([]);
     const [loadingGoals, setLoadingGoals] = useState(true);
-
     const [editingGoalId, setEditingGoalId] = useState(null);
-    const [goalReviews, setGoalReviews] = useState({});
 
     useEffect(() => {
         fetchMyGoals();
@@ -51,16 +26,9 @@ export const EmployeeView = () => {
         setLoadingGoals(true);
         try {
             const goals = await api.getEmployeeGoals(user.employee.id);
-            const sortedGoals = goals.sort((a, b) => a.status === 'DRAFT' ? -1 : 1);
-            setMyGoals(sortedGoals);
-
-            const reviewPromises = goals.map(g =>
-                api.getReviews(g.id).then(reviews => [g.id, reviews]).catch(() => [g.id, []])
-            );
-            const reviewEntries = await Promise.all(reviewPromises);
-            setGoalReviews(Object.fromEntries(reviewEntries));
+            setMyGoals(goals.sort((a, b) => a.status === 'DRAFT' ? -1 : 1));
         } catch (error) {
-            console.error("Failed to fetch my goals", error);
+            console.error('Failed to fetch my goals', error);
         } finally {
             setLoadingGoals(false);
         }
@@ -72,9 +40,8 @@ export const EmployeeView = () => {
         try {
             const result = await api.evaluateGoal(draftGoalText);
             setEvaluation(result);
-        } catch (error) {
-            console.error(error);
-            alert("Ошибка при вызове AI-оценщика");
+        } catch {
+            // handled silently
         } finally {
             setEvaluating(false);
         }
@@ -84,28 +51,22 @@ export const EmployeeView = () => {
         if (!draftGoalText) return;
         setSaving(true);
         try {
-            const payload = {
-                goal_text: draftGoalText,
-                metric: draftMetric || null,
-                quarter: user.quarter,
-                year: user.year,
-                employee_id: user.employee.id,
-                department_id: user.employee.department_id,
-            };
-
             if (editingGoalId) {
                 await api.updateGoal(editingGoalId, { goal_text: draftGoalText, metric: draftMetric || null });
-                alert("Цель успешно обновлена!");
             } else {
-                await api.createGoal(payload);
-                alert("Цель сохранена и отправлена на проверку руководителю!");
+                await api.createGoal({
+                    goal_text: draftGoalText,
+                    metric: draftMetric || null,
+                    quarter: user.quarter,
+                    year: user.year,
+                    employee_id: user.employee.id,
+                    department_id: user.employee.department_id,
+                });
             }
-
             resetForm();
             await fetchMyGoals();
-        } catch (error) {
-            console.error(error);
-            alert("Ошибка при сохранении цели в базу данных");
+        } catch {
+            // handled silently
         } finally {
             setSaving(false);
         }
@@ -120,14 +81,13 @@ export const EmployeeView = () => {
     };
 
     const handleDeleteClick = async (goalId) => {
-        if (!window.confirm("Вы уверены, что хотите удалить эту цель?")) return;
+        if (!window.confirm('Вы уверены, что хотите удалить эту цель?')) return;
         try {
             await api.deleteGoal(goalId);
             await fetchMyGoals();
             if (editingGoalId === goalId) resetForm();
-        } catch (error) {
-            console.error(error);
-            alert("Не удалось удалить цель.");
+        } catch {
+            // handled silently
         }
     };
 
@@ -146,81 +106,146 @@ export const EmployeeView = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const goalCountWarning = myGoals.length > 0 && myGoals.length < 3;
+
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 bg-gray-50 min-h-screen">
-            <div className="mb-8">
-                <h1 className="text-3xl font-extrabold text-gray-900">Кабинет сотрудника</h1>
-                <p className="mt-2 text-sm text-gray-600">Планирование и оценка целей с помощью AI</p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="mb-6">
+                <h1 className="text-2xl font-bold text-gray-900">Кабинет сотрудника</h1>
+                <p className="mt-1 text-sm text-gray-500">Планирование и оценка целей с помощью AI</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-                <div>
-                    <div className="bg-white shadow rounded-lg p-6 border border-gray-200 relative">
-                        {editingGoalId && (
-                            <div className="absolute top-0 right-0 bg-yellow-100 text-yellow-800 px-3 py-1 text-xs font-bold rounded-bl-lg rounded-tr-lg">
-                                РЕЖИМ РЕДАКТИРОВАНИЯ
-                            </div>
-                        )}
-                        <h2 className="text-xl font-bold mb-4">{editingGoalId ? 'Редактирование цели' : 'Новая цель'}</h2>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Текст цели (формулировка по SMART)</label>
-                                <textarea
-                                    rows={5}
-                                    placeholder="Например: Снизить среднее время обработки заявок отдела с 48 до 36 часов к 31 марта 2026 года..."
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                                    value={draftGoalText}
-                                    onChange={e => setDraftGoalText(e.target.value)}
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">KPI-метрика (необязательно)</label>
-                                <input
-                                    type="text"
-                                    placeholder="Например: sla_compliance, cost_saving_kzt"
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500"
-                                    value={draftMetric}
-                                    onChange={e => setDraftMetric(e.target.value)}
-                                />
-                            </div>
-
-                            <div className="flex space-x-3 pt-2">
-                                <button
-                                    onClick={handleEvaluate}
-                                    disabled={evaluating || saving || !draftGoalText}
-                                    className="flex-1 bg-indigo-600 text-white py-2 px-4 rounded hover:bg-indigo-700 disabled:opacity-50 transition font-medium"
-                                >
-                                    {evaluating ? 'Анализ ИИ...' : 'Оценить по SMART'}
-                                </button>
-                                <button
-                                    onClick={handleSaveGoal}
-                                    disabled={evaluating || saving || !draftGoalText}
-                                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700 disabled:opacity-50 transition font-medium"
-                                >
-                                    {saving ? 'Сохранение...' : (editingGoalId ? 'Сохранить изменения' : 'Отправить руководителю')}
-                                </button>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                {/* Goal form */}
+                <div className="space-y-4">
+                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+                        {/* Form header */}
+                        <div className={`px-6 py-4 border-b border-gray-100 ${editingGoalId ? 'bg-gradient-to-r from-amber-50 to-orange-50' : 'bg-gradient-to-r from-indigo-50 to-blue-50'}`}>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2.5">
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${editingGoalId ? 'bg-amber-100 text-amber-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                        {editingGoalId ? (
+                                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125" />
+                                            </svg>
+                                        ) : (
+                                            <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <h2 className="text-sm font-bold text-gray-900">
+                                            {editingGoalId ? 'Редактирование цели' : 'Новая цель'}
+                                        </h2>
+                                        <p className="text-xs text-gray-500">Формулировка по методологии SMART</p>
+                                    </div>
+                                </div>
                                 {editingGoalId && (
                                     <button
                                         onClick={resetForm}
-                                        className="bg-gray-200 text-gray-700 py-2 px-4 rounded hover:bg-gray-300 transition font-medium"
+                                        className="text-xs font-medium text-gray-500 hover:text-gray-700 bg-white/80 hover:bg-white px-2.5 py-1.5 rounded-lg transition border border-gray-200"
                                     >
                                         Отмена
                                     </button>
                                 )}
                             </div>
                         </div>
+
+                        {/* Form body */}
+                        <div className="p-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                    Текст цели
+                                </label>
+                                <textarea
+                                    rows={4}
+                                    placeholder="Снизить среднее время обработки заявок отдела с 48 до 36 часов к 31 марта 2026 года за счёт автоматизации процесса первичной классификации..."
+                                    className="block w-full border border-gray-200 rounded-lg shadow-sm p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none bg-gray-50 placeholder:text-gray-400"
+                                    value={draftGoalText}
+                                    onChange={e => setDraftGoalText(e.target.value)}
+                                />
+                                {draftGoalText.length > 0 && (
+                                    <div className="mt-1 text-right">
+                                        <span className={`text-xs ${draftGoalText.length > 300 ? 'text-green-600' : 'text-gray-400'}`}>
+                                            {draftGoalText.length} символов
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                    KPI-метрика <span className="text-gray-400 font-normal">(необязательно)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="sla_compliance, cost_saving_kzt"
+                                    className="block w-full border border-gray-200 rounded-lg shadow-sm px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 placeholder:text-gray-400"
+                                    value={draftMetric}
+                                    onChange={e => setDraftMetric(e.target.value)}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Form actions */}
+                        <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex gap-2.5">
+                            <button
+                                onClick={handleEvaluate}
+                                disabled={evaluating || saving || !draftGoalText}
+                                className="flex-1 bg-white text-indigo-700 border border-indigo-200 py-2.5 px-4 rounded-lg hover:bg-indigo-50 disabled:opacity-50 transition font-medium text-sm shadow-sm flex items-center justify-center gap-2"
+                            >
+                                {evaluating ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Анализ...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.251.023-.501.05-.75.082m.75-.082a24.301 24.301 0 014.5 0m0 0v5.714c0 .597.237 1.17.659 1.591L19.8 15.3M14.25 3.104c.251.023.501.05.75.082M19.8 15.3l-1.57.393A9.065 9.065 0 0112 15a9.065 9.065 0 00-6.23.693L5 14.5m14.8.8l1.402 1.402c1.232 1.232.65 3.318-1.067 3.611A48.309 48.309 0 0112 21c-2.773 0-5.491-.235-8.135-.687-1.718-.293-2.3-2.379-1.067-3.61L5 14.5" />
+                                        </svg>
+                                        Оценить по SMART
+                                    </>
+                                )}
+                            </button>
+                            <button
+                                onClick={handleSaveGoal}
+                                disabled={evaluating || saving || !draftGoalText}
+                                className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition font-medium text-sm shadow-sm flex items-center justify-center gap-2"
+                            >
+                                {saving ? (
+                                    <>
+                                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                        Сохранение...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+                                        </svg>
+                                        {editingGoalId ? 'Сохранить' : 'Отправить'}
+                                    </>
+                                )}
+                            </button>
+                        </div>
                     </div>
 
-                    <div className="mt-8">
+                    {evaluation && (
                         <SmartScoreCard
                             evaluation={evaluation}
-                            onApplyReformulation={(improvedGoalText) => {
-                                setDraftGoalText(improvedGoalText);
+                            onApplyReformulation={(text) => {
+                                setDraftGoalText(text);
                                 setEvaluation(null);
                                 window.scrollTo({ top: 0, behavior: 'smooth' });
                             }}
                         />
-                    </div>
+                    )}
                 </div>
 
                 <div>
@@ -228,89 +253,51 @@ export const EmployeeView = () => {
                 </div>
             </div>
 
-            <div className="bg-white shadow rounded-lg border border-gray-200 overflow-hidden mt-8">
-                <div className="px-6 py-5 border-b border-gray-200 bg-gray-50">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">Мои цели</h3>
+            {/* Goals list */}
+            <div>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-gray-900">Мои цели</h3>
+                    {myGoals.length > 0 && (
+                        <span className="text-sm text-gray-400">{myGoals.length} целей</span>
+                    )}
                 </div>
 
+                {goalCountWarning && (
+                    <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 font-medium">
+                        {`У вас ${myGoals.length} цел${myGoals.length === 1 ? 'ь' : 'и'} — рекомендуется минимум 3 для полноценного набора.`}
+                    </div>
+                )}
+
                 {loadingGoals ? (
-                    <div className="p-6 text-center text-gray-500">Загрузка ваших целей...</div>
+                    <div className="space-y-4">
+                        {[1,2,3].map(i => <GoalCardSkeleton key={i} />)}
+                    </div>
+                ) : myGoals.length === 0 ? (
+                    <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+                        <div className="text-gray-400 mb-2">
+                            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            У вас пока нет сохраненных целей
+                        </div>
+                        <p className="text-sm text-gray-400">Создайте новую цель с помощью формы выше</p>
+                    </div>
                 ) : (
-                    <div className="p-6">
-                        {myGoals.length > 0 && (myGoals.length < 3 || myGoals.length > 5) && (
-                            <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded text-sm text-orange-800 font-medium">
-                                {myGoals.length < 3
-                                    ? `У вас ${myGoals.length} цел${myGoals.length === 1 ? 'ь' : 'и'} — рекомендуется минимум 3 для полноценного набора.`
-                                    : `У вас ${myGoals.length} целей — рекомендуется максимум 5.`
-                                }
-                            </div>
-                        )}
-                        <ul className="divide-y divide-gray-200">
-                            {myGoals.map((goal) => (
-                                <li key={goal.id} className="p-6 hover:bg-gray-50 transition">
-                                    <div className="flex items-start justify-between">
-                                        <div className="flex-1 pr-4">
-                                            <p className="text-sm text-gray-800 whitespace-pre-line">{goal.goal_text}</p>
-                                            {goal.metric && (
-                                                <span className="inline-block mt-2 text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded font-medium">
-                                                    KPI: {goal.metric}
-                                                </span>
-                                            )}
-                                            <div className="mt-3 flex items-center space-x-4 text-sm text-gray-500">
-                                                <span>Период: Q{goal.quarter} {goal.year}</span>
-                                                <GoalStatusBadge status={goal.status} />
-                                            </div>
-                                        </div>
-
-                                        {!LOCKED_STATUSES.includes(goal.status) && (
-                                            <div className="flex space-x-3 ml-4">
-                                                <button
-                                                    onClick={() => handleEditClick(goal)}
-                                                    className="text-sm font-medium text-blue-600 hover:text-blue-800 transition"
-                                                >
-                                                    Редактировать
-                                                </button>
-                                                <button
-                                                    onClick={() => handleDeleteClick(goal.id)}
-                                                    className="text-sm font-medium text-red-600 hover:text-red-800 transition"
-                                                >
-                                                    Удалить
-                                                </button>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {goalReviews[goal.id] && goalReviews[goal.id].length > 0 && (
-                                        <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
-                                            <h5 className="text-xs font-bold text-gray-500 uppercase">Отзывы руководителя</h5>
-                                            {goalReviews[goal.id].map((r) => (
-                                                <div key={r.id} className="text-sm p-2.5 bg-gray-50 rounded border border-gray-100">
-                                                    <div className="flex items-center space-x-2 mb-1">
-                                                        <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
-                                                            r.verdict === 'approve' ? 'bg-green-100 text-green-700'
-                                                            : r.verdict === 'reject' ? 'bg-red-100 text-red-700'
-                                                            : r.verdict === 'needs_changes' ? 'bg-orange-100 text-orange-700'
-                                                            : 'bg-gray-100 text-gray-600'
-                                                        }`}>
-                                                            {r.verdict === 'approve' ? 'Утверждено' :
-                                                             r.verdict === 'reject' ? 'Отклонено' :
-                                                             r.verdict === 'needs_changes' ? 'Требует доработки' : 'Комментарий'}
-                                                        </span>
-                                                        <span className="text-xs text-gray-400">
-                                                            {r.created_at ? new Date(r.created_at).toLocaleDateString('ru-RU') : ''}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-gray-700">{r.comment_text}</p>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </li>
-                            ))}
-                            {myGoals.length === 0 && (
-                                <li className="p-6 text-center text-gray-500">У вас пока нет сохраненных целей.</li>
-                            )}
-                        </ul>
+                    <div className="space-y-4">
+                        {myGoals.map(goal => (
+                            <GoalCard
+                                key={goal.id}
+                                goal={goal}
+                                mode="employee"
+                                onEdit={handleEditClick}
+                                onDelete={handleDeleteClick}
+                                onApplyImproved={(text) => {
+                                    setDraftGoalText(text);
+                                    setEvaluation(null);
+                                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                                }}
+                            />
+                        ))}
                     </div>
                 )}
             </div>

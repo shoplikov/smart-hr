@@ -127,6 +127,16 @@ CREATE TABLE public.goal_events (
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+CREATE TABLE public.goal_evaluations (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    goal_id uuid NOT NULL,
+    smart_index numeric(4,3),
+    smart_scores jsonb,
+    recommendations jsonb,
+    improved_goal text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
 CREATE TABLE public.goal_reviews (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     goal_id uuid NOT NULL,
@@ -248,6 +258,7 @@ ALTER TABLE ONLY public.employee_projects ADD CONSTRAINT employee_projects_pkey 
 ALTER TABLE ONLY public.employees ADD CONSTRAINT employees_email_key UNIQUE (email);
 ALTER TABLE ONLY public.employees ADD CONSTRAINT employees_employee_code_key UNIQUE (employee_code);
 ALTER TABLE ONLY public.employees ADD CONSTRAINT employees_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.goal_evaluations ADD CONSTRAINT goal_evaluations_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.goal_events ADD CONSTRAINT goal_events_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.goal_reviews ADD CONSTRAINT goal_reviews_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.goals ADD CONSTRAINT goals_pkey PRIMARY KEY (goal_id);
@@ -271,6 +282,7 @@ CREATE INDEX idx_employee_projects_project_id ON public.employee_projects USING 
 CREATE INDEX idx_employees_department_id ON public.employees USING btree (department_id);
 CREATE INDEX idx_employees_manager_id ON public.employees USING btree (manager_id);
 CREATE INDEX idx_employees_position_id ON public.employees USING btree (position_id);
+CREATE INDEX idx_goal_evaluations_goal_id ON public.goal_evaluations USING btree (goal_id);
 CREATE INDEX idx_goal_events_created_at ON public.goal_events USING btree (created_at);
 CREATE INDEX idx_goal_events_event_type ON public.goal_events USING btree (event_type);
 CREATE INDEX idx_goal_events_goal_id ON public.goal_events USING btree (goal_id);
@@ -308,6 +320,7 @@ ALTER TABLE ONLY public.employee_projects ADD CONSTRAINT employee_projects_proje
 ALTER TABLE ONLY public.employees ADD CONSTRAINT employees_department_id_fkey FOREIGN KEY (department_id) REFERENCES public.departments(id) ON DELETE RESTRICT;
 ALTER TABLE ONLY public.employees ADD CONSTRAINT employees_manager_id_fkey FOREIGN KEY (manager_id) REFERENCES public.employees(id) ON DELETE SET NULL DEFERRABLE INITIALLY DEFERRED;
 ALTER TABLE ONLY public.employees ADD CONSTRAINT employees_position_id_fkey FOREIGN KEY (position_id) REFERENCES public.positions(id) ON DELETE RESTRICT;
+ALTER TABLE ONLY public.goal_evaluations ADD CONSTRAINT goal_evaluations_goal_id_fkey FOREIGN KEY (goal_id) REFERENCES public.goals(goal_id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.goal_events ADD CONSTRAINT goal_events_actor_id_fkey FOREIGN KEY (actor_id) REFERENCES public.employees(id) ON DELETE SET NULL;
 ALTER TABLE ONLY public.goal_events ADD CONSTRAINT goal_events_goal_id_fkey FOREIGN KEY (goal_id) REFERENCES public.goals(goal_id) ON DELETE CASCADE;
 ALTER TABLE ONLY public.goal_reviews ADD CONSTRAINT goal_reviews_goal_id_fkey FOREIGN KEY (goal_id) REFERENCES public.goals(goal_id) ON DELETE CASCADE;

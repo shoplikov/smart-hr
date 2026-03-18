@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 class SmartEvaluatorService:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = "gpt-4o"
+        self.model = "gpt-4o-mini"
 
     async def evaluate_goal(self, goal_text: str) -> GoalEvaluationResult:
         logger.info(f"Evaluating SMART criteria for goal: {goal_text[:80]}")
