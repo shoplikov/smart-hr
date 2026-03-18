@@ -1,54 +1,91 @@
 import React from 'react';
 
-const CriterionRow = ({ label, data }) => {
-    if (!data) return null;
-    const isMet = data.is_met;
-    
-    return (
-        <div className="border-b py-3 last:border-b-0">
-            <div className="flex items-center justify-between mb-1">
-                <span className="font-semibold text-gray-800">{label}</span>
-                <span className={`px-2 py-1 text-xs font-bold rounded ${isMet ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                    {isMet ? 'Выполнено' : 'Требует доработки'}
-                </span>
-            </div>
-            <p className="text-sm text-gray-600 mb-1">{data.reasoning}</p>
-            {!isMet && data.suggestion && (
-                <div className="text-sm text-blue-700 bg-blue-50 p-2 rounded border border-blue-100">
-                    <strong>Совет ИИ:</strong> {data.suggestion}
-                </div>
-            )}
-        </div>
-    );
+const CRITERIA_LABELS = {
+    specific: 'Specific (Конкретность)',
+    measurable: 'Measurable (Измеримость)',
+    achievable: 'Achievable (Достижимость)',
+    relevant: 'Relevant (Актуальность)',
+    time_bound: 'Time-bound (Ограниченность во времени)',
 };
 
-export const SmartScoreCard = ({ evaluation }) => {
+const scoreColor = (score) => {
+    if (score >= 0.8) return 'text-green-600';
+    if (score >= 0.5) return 'text-yellow-600';
+    return 'text-red-600';
+};
+
+const barColor = (score) => {
+    if (score >= 0.8) return 'bg-green-500';
+    if (score >= 0.5) return 'bg-yellow-500';
+    return 'bg-red-500';
+};
+
+const CriterionBar = ({ label, score }) => (
+    <div className="mb-3">
+        <div className="flex items-center justify-between mb-1">
+            <span className="text-sm font-medium text-gray-700">{label}</span>
+            <span className={`text-sm font-bold ${scoreColor(score)}`}>{score.toFixed(1)}</span>
+        </div>
+        <div className="w-full bg-gray-200 rounded-full h-2.5">
+            <div
+                className={`h-2.5 rounded-full transition-all ${barColor(score)}`}
+                style={{ width: `${Math.max(score * 100, 2)}%` }}
+            />
+        </div>
+    </div>
+);
+
+export const SmartScoreCard = ({ evaluation, onApplyReformulation }) => {
     if (!evaluation) return null;
 
-    const { s_specific, m_measurable, a_achievable, r_relevant, t_time_bound, overall_score, final_recommendation } = evaluation;
+    const { smart_scores, smart_index, recommendations, improved_goal } = evaluation;
 
     return (
         <div className="bg-white shadow rounded-lg p-6 mt-4 border border-gray-200">
             <div className="flex items-center justify-between mb-6">
                 <h3 className="text-xl font-bold text-gray-800">Анализ SMART</h3>
                 <div className="flex items-center">
-                    <span className="text-3xl font-extrabold text-blue-600 mr-2">{overall_score}</span>
-                    <span className="text-gray-500">/ 100</span>
+                    <span className={`text-3xl font-extrabold mr-2 ${scoreColor(smart_index)}`}>
+                        {smart_index.toFixed(2)}
+                    </span>
+                    <span className="text-gray-500">/ 1.0</span>
                 </div>
             </div>
 
             <div className="bg-gray-50 rounded p-4 mb-4">
-                <CriterionRow label="Specific (Конкретность)" data={s_specific} />
-                <CriterionRow label="Measurable (Измеримость)" data={m_measurable} />
-                <CriterionRow label="Achievable (Достижимость)" data={a_achievable} />
-                <CriterionRow label="Relevant (Актуальность)" data={r_relevant} />
-                <CriterionRow label="Time-bound (Ограниченность во времени)" data={t_time_bound} />
+                {smart_scores && Object.entries(CRITERIA_LABELS).map(([key, label]) => (
+                    <CriterionBar key={key} label={label} score={smart_scores[key] ?? 0} />
+                ))}
             </div>
 
-            <div className="mt-4 p-4 bg-indigo-50 border-l-4 border-indigo-500 rounded">
-                <h4 className="font-bold text-indigo-800 mb-1">Итоговая рекомендация</h4>
-                <p className="text-indigo-900 text-sm">{final_recommendation}</p>
-            </div>
+            {recommendations && recommendations.length > 0 && (
+                <div className="mt-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+                    <h4 className="font-bold text-blue-800 mb-2">Рекомендации</h4>
+                    <ul className="space-y-1.5">
+                        {recommendations.map((rec, idx) => (
+                            <li key={idx} className="text-sm text-blue-900 flex items-start">
+                                <span className="mr-2 mt-0.5 text-blue-400">•</span>
+                                <span>{rec}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
+
+            {improved_goal && (
+                <div className="mt-4 p-4 bg-emerald-50 border-l-4 border-emerald-500 rounded">
+                    <h4 className="font-bold text-emerald-800 mb-2">Улучшенная формулировка цели</h4>
+                    <p className="text-emerald-900 text-sm mb-3 whitespace-pre-line">{improved_goal}</p>
+                    {onApplyReformulation && (
+                        <button
+                            onClick={() => onApplyReformulation(improved_goal)}
+                            className="text-sm font-medium text-white bg-emerald-600 hover:bg-emerald-700 py-1.5 px-4 rounded transition"
+                        >
+                            Применить улучшенную версию
+                        </button>
+                    )}
+                </div>
+            )}
         </div>
     );
 };

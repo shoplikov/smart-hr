@@ -5,17 +5,17 @@ from pydantic import BaseModel, Field
 
 # --- Goal Schemas ---
 class GoalCreate(BaseModel):
-    title: str = Field(..., description="Название цели")
-    description: str = Field(..., description="Описание цели")
+    goal_text: str = Field(..., description="Текст цели")
+    metric: Optional[str] = Field(None, description="KPI-метрика (необязательно)")
     quarter: int = Field(..., ge=1, le=4, description="Квартал (1-4)")
     year: int = Field(..., ge=2020, description="Год")
     employee_id: int = Field(..., description="ID сотрудника")
-    department_id: int = Field(1, description="ID отдела")
+    department_id: int = Field(..., description="ID отдела")
 
 
 class GoalUpdate(BaseModel):
-    title: str
-    description: str
+    goal_text: str = Field(..., description="Текст цели")
+    metric: Optional[str] = Field(None, description="KPI-метрика (необязательно)")
 
 
 class GoalStatusUpdate(BaseModel):
@@ -24,8 +24,8 @@ class GoalStatusUpdate(BaseModel):
 
 class GoalResponse(BaseModel):
     id: str
-    title: str
-    description: str
+    goal_text: str
+    metric: Optional[str] = None
     quarter: int
     year: int
     employee_id: int
@@ -36,8 +36,7 @@ class GoalResponse(BaseModel):
 
 # --- AI Request Schemas ---
 class GoalEvaluateRequest(BaseModel):
-    title: str = Field(..., description="Название цели для оценки")
-    description: str = Field(..., description="Описание цели для оценки")
+    goal_text: str = Field(..., description="Текст цели для оценки")
 
 
 class GoalGenerateRequest(BaseModel):
@@ -47,6 +46,15 @@ class GoalGenerateRequest(BaseModel):
     department: str = Field(..., description="Отдел (например, 'Engineering')")
     quarter: int = Field(..., ge=1, le=4)
     year: int = Field(..., ge=2020)
+
+
+# --- Review Schemas ---
+class GoalReviewCreate(BaseModel):
+    verdict: str = Field(
+        ..., description="Вердикт: approve, reject, needs_changes, comment_only"
+    )
+    comment_text: str = Field(..., description="Комментарий к ревью")
+    reviewer_id: int = Field(..., description="ID руководителя-ревьюера")
 
 
 # --- Analytics Schemas ---

@@ -13,6 +13,11 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./01_schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
       - ./02_data.sql:/docker-entrypoint-initdb.d/02_data.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hr_user -d hr_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
   pgadmin:
     image: dpage/pgadmin4:latest
     container_name: hr_pgadmin
@@ -49,8 +54,10 @@ services:
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
     depends_on:
-      - db
-      - chroma
+      db:
+        condition: service_healthy
+      chroma:
+        condition: service_started
     volumes:
       - ./backend/src:/app/src
       - ./backend/prompts.yaml:/app/prompts.yaml

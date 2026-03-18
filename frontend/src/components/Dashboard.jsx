@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 
-export const Dashboard = () => {
+export const Dashboard = ({ departmentId }) => {
     const [chartData, setChartData] = useState([]);
     const [kpiInfo, setKpiInfo] = useState({ name: "Загрузка...", unit: "" });
     const [loading, setLoading] = useState(true);
@@ -18,14 +18,13 @@ export const Dashboard = () => {
     ];
 
     useEffect(() => {
-        fetchMetrics();
-    }, [selectedMetric]);
+        if (departmentId) fetchMetrics();
+    }, [selectedMetric, departmentId]);
 
     const fetchMetrics = async () => {
         setLoading(true);
         try {
-            // Запрашиваем данные для отдела 6 и выбранной метрики
-            const response = await api.getDepartmentKpi(6, selectedMetric);
+            const response = await api.getDepartmentKpi(departmentId, selectedMetric);
             setChartData(response.data);
             setKpiInfo({ name: response.kpi_name, unit: response.unit });
         } catch (error) {

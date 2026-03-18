@@ -21,7 +21,9 @@ CREATE TYPE public.goal_event_type_enum AS ENUM (
 );
 
 CREATE TYPE public.goal_status_enum AS ENUM (
-    'draft', 'active', 'submitted', 'approved', 'in_progress', 'done', 'cancelled', 'overdue', 'archived'
+    'draft', 'active', 'submitted', 'approved', 'in_progress',
+    'needs_changes', 'rejected',
+    'done', 'cancelled', 'overdue', 'archived'
 );
 
 CREATE TYPE public.project_role_enum AS ENUM (

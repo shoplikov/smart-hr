@@ -1,11 +1,24 @@
-const API_BASE = 'http://localhost:8000/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export const api = {
-    evaluateGoal: async (title, description) => {
+    getEmployees: async (managerId) => {
+        const params = managerId != null ? `?manager_id=${managerId}` : '';
+        const response = await fetch(`${API_BASE}/employees${params}`);
+        if (!response.ok) throw new Error('Ошибка при загрузке списка сотрудников');
+        return response.json();
+    },
+
+    getDepartments: async () => {
+        const response = await fetch(`${API_BASE}/departments`);
+        if (!response.ok) throw new Error('Ошибка при загрузке списка отделов');
+        return response.json();
+    },
+
+    evaluateGoal: async (goalText) => {
         const response = await fetch(`${API_BASE}/goals/ai/evaluate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, description })
+            body: JSON.stringify({ goal_text: goalText })
         });
         if (!response.ok) throw new Error('Ошибка при оценке цели');
         return response.json();
@@ -69,5 +82,27 @@ export const api = {
         });
         if (!response.ok) throw new Error('Ошибка при удалении цели');
         return true;
+    },
+
+    batchEvaluateGoals: async (employeeId) => {
+        const response = await fetch(`${API_BASE}/goals/ai/evaluate-batch/${employeeId}`);
+        if (!response.ok) throw new Error('Ошибка при пакетной оценке целей');
+        return response.json();
+    },
+
+    createReview: async (goalId, payload) => {
+        const response = await fetch(`${API_BASE}/goals/${goalId}/reviews`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Ошибка при сохранении ревью');
+        return response.json();
+    },
+
+    getReviews: async (goalId) => {
+        const response = await fetch(`${API_BASE}/goals/${goalId}/reviews`);
+        if (!response.ok) throw new Error('Ошибка при загрузке ревью');
+        return response.json();
     },
 };

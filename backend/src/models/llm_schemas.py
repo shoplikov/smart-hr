@@ -1,31 +1,38 @@
-from typing import Optional
-
 from pydantic import BaseModel, Field
 
 
-class SmartCriterion(BaseModel):
-    is_met: bool = Field(..., description="Выполнен ли этот критерий? (True/False)")
-    reasoning: str = Field(
-        ..., description="Обоснование оценки этого критерия (1-2 предложения)."
+class SmartScores(BaseModel):
+    """Per-criterion SMART scores, each 0.0–1.0."""
+
+    specific: float = Field(..., ge=0.0, le=1.0, description="Оценка конкретности (S)")
+    measurable: float = Field(
+        ..., ge=0.0, le=1.0, description="Оценка измеримости (M)"
     )
-    suggestion: Optional[str] = Field(
-        None, description="Совет по улучшению, если критерий не выполнен."
+    achievable: float = Field(
+        ..., ge=0.0, le=1.0, description="Оценка достижимости (A)"
+    )
+    relevant: float = Field(
+        ..., ge=0.0, le=1.0, description="Оценка актуальности (R)"
+    )
+    time_bound: float = Field(
+        ..., ge=0.0, le=1.0, description="Оценка ограниченности во времени (T)"
     )
 
 
 class GoalEvaluationResult(BaseModel):
-    """Pydantic schema enforcing the exact structure of the SMART evaluation output."""
+    """Matches the hackathon spec output format for SMART evaluation."""
 
-    s_specific: SmartCriterion
-    m_measurable: SmartCriterion
-    a_achievable: SmartCriterion
-    r_relevant: SmartCriterion
-    t_time_bound: SmartCriterion
-    overall_score: int = Field(
-        ..., ge=0, le=100, description="Общий балл качества цели от 0 до 100."
+    smart_scores: SmartScores
+    smart_index: float = Field(
+        ..., ge=0.0, le=1.0, description="Агрегированный SMART-индекс от 0.0 до 1.0."
     )
-    final_recommendation: str = Field(
-        ..., description="Итоговая рекомендация или вердикт (2-3 предложения)."
+    recommendations: list[str] = Field(
+        ...,
+        description="Список рекомендаций по улучшению (каждая с префиксом критерия, например 'S: ...').",
+    )
+    improved_goal: str = Field(
+        ...,
+        description="Улучшенная переформулировка цели, полностью соответствующая критериям SMART.",
     )
 
 
@@ -35,6 +42,12 @@ class GeneratedGoal(BaseModel):
         description="Подробное описание цели, соответствующее критериям SMART"
     )
     metrics: list[str] = Field(description="Список ключевых метрик успеха (KPIs)")
+    source_document: str = Field(
+        description="Название ВНД или стратегического документа, на основе которого сгенерирована цель"
+    )
+    source_fragment: str = Field(
+        description="Релевантная цитата или фрагмент из исходного документа"
+    )
 
 
 class GoalGenerationResult(BaseModel):

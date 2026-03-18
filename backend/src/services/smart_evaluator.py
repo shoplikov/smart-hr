@@ -13,15 +13,14 @@ class SmartEvaluatorService:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = "gpt-4o"
 
-    async def evaluate_goal(self, title: str, description: str) -> GoalEvaluationResult:
-        logger.info(f"Evaluating SMART criteria for goal: {title}")
+    async def evaluate_goal(self, goal_text: str) -> GoalEvaluationResult:
+        logger.info(f"Evaluating SMART criteria for goal: {goal_text[:80]}")
 
         system_prompt = prompt_manager.get_prompt("smart_evaluator", "system")
         user_prompt = prompt_manager.get_prompt(
             "smart_evaluator",
             "user",
-            title=title,
-            description=description,
+            goal_text=goal_text,
         )
 
         response = await self.client.beta.chat.completions.parse(

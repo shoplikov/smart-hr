@@ -46,6 +46,8 @@ class GoalStatusEnum(str, enum.Enum):
     submitted = "submitted"
     approved = "approved"
     in_progress = "in_progress"
+    needs_changes = "needs_changes"
+    rejected = "rejected"
     done = "done"
     cancelled = "cancelled"
     overdue = "overdue"
@@ -57,6 +59,13 @@ class QuarterEnum(str, enum.Enum):
     Q2 = "Q2"
     Q3 = "Q3"
     Q4 = "Q4"
+
+
+class ReviewVerdictEnum(str, enum.Enum):
+    approve = "approve"
+    reject = "reject"
+    needs_changes = "needs_changes"
+    comment_only = "comment_only"
 
 
 class ProjectStatusEnum(str, enum.Enum):
@@ -141,6 +150,11 @@ class Goal(Base):
     department_id = Column(
         Integer, ForeignKey("departments.id", ondelete="RESTRICT"), nullable=False
     )
+    employee_name_snapshot = Column(Text)
+    position_snapshot = Column(Text)
+    department_name_snapshot = Column(Text)
+    project_id = Column(UUID(as_uuid=True))
+    system_id = Column(Integer)
     goal_text = Column(Text, nullable=False)
     year = Column(SmallInteger, nullable=False)
     quarter = Column(
@@ -154,6 +168,53 @@ class Goal(Base):
         default=GoalStatusEnum.draft,
         nullable=False,
     )
+    external_ref = Column(Text)
+    priority = Column(SmallInteger)
+    created_at = Column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )
+    updated_at = Column(
+        DateTime(timezone=True),
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+        nullable=False,
+    )
+
+
+class GoalReview(Base):
+    __tablename__ = "goal_reviews"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    goal_id = Column(
+        UUID(as_uuid=True), ForeignKey("goals.goal_id", ondelete="CASCADE"), nullable=False
+    )
+    reviewer_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"))
+    verdict = Column(
+        ENUM(ReviewVerdictEnum, name="review_verdict_enum", create_type=False),
+        default=ReviewVerdictEnum.comment_only,
+        nullable=False,
+    )
+    comment_text = Column(Text, nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+    )
+
+
+class GoalEvent(Base):
+    __tablename__ = "goal_events"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    goal_id = Column(
+        UUID(as_uuid=True), ForeignKey("goals.goal_id", ondelete="CASCADE"), nullable=False
+    )
+    event_type = Column(
+        ENUM(GoalEventTypeEnum, name="goal_event_type_enum", create_type=False),
+        nullable=False,
+    )
+    actor_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"))
+    old_status = Column(ENUM(GoalStatusEnum, name="goal_status_enum", create_type=False))
+    new_status = Column(ENUM(GoalStatusEnum, name="goal_status_enum", create_type=False))
+    old_text = Column(Text)
+    new_text = Column(Text)
+    event_metadata = Column("metadata", JSONB)
     created_at = Column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )

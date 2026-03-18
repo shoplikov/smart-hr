@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 
@@ -6,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.core.config import settings
 from src.core.database import AsyncSessionLocal
-from src.routers import analytics, goals
+from src.routers import analytics, employees, goals
 from src.services.rag_service import rag_service
 
 logging.basicConfig(
@@ -14,20 +15,34 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+MAX_INGESTION_RETRIES = 5
+RETRY_DELAY_SECONDS = 3
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        if rag_service.collection.count() == 0:
-            logger.info("ChromaDB collection is empty — starting document ingestion...")
-            async with AsyncSessionLocal() as session:
-                await rag_service.ingest_documents(session)
-        else:
-            logger.info(
-                f"ChromaDB already has {rag_service.collection.count()} chunks, skipping ingestion."
-            )
-    except Exception as e:
-        logger.error(f"RAG ingestion failed on startup: {e}")
+    if rag_service.collection.count() == 0:
+        logger.info("ChromaDB collection is empty — starting document ingestion...")
+        for attempt in range(1, MAX_INGESTION_RETRIES + 1):
+            try:
+                async with AsyncSessionLocal() as session:
+                    await rag_service.ingest_documents(session)
+                break
+            except Exception as e:
+                if attempt < MAX_INGESTION_RETRIES:
+                    logger.warning(
+                        f"RAG ingestion attempt {attempt}/{MAX_INGESTION_RETRIES} failed: {e} "
+                        f"— retrying in {RETRY_DELAY_SECONDS}s..."
+                    )
+                    await asyncio.sleep(RETRY_DELAY_SECONDS)
+                else:
+                    logger.error(
+                        f"RAG ingestion failed after {MAX_INGESTION_RETRIES} attempts: {e}"
+                    )
+    else:
+        logger.info(
+            f"ChromaDB already has {rag_service.collection.count()} chunks, skipping ingestion."
+        )
     yield
 
 
@@ -51,6 +66,7 @@ def create_app() -> FastAPI:
 
     app.include_router(goals.router)
     app.include_router(analytics.router)
+    app.include_router(employees.router)
 
     @app.get("/health")
     async def health_check():

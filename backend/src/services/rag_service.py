@@ -1,5 +1,4 @@
 import asyncio
-import json
 import logging
 import os
 from typing import List
@@ -88,18 +87,27 @@ class RAGService:
     async def search_relevant_context(
         self, query: str, top_k: int = 3, department_scope: str = None
     ) -> str:
+        """Returns formatted context chunks with document titles for RAG citation."""
         query_embedding = await self._generate_embeddings([query])
 
         results = await asyncio.to_thread(
             self.collection.query,
             query_embeddings=query_embedding,
             n_results=top_k,
+            include=["documents", "metadatas"],
         )
 
         if not results["documents"] or not results["documents"][0]:
             return ""
 
-        return "\n---\n".join(results["documents"][0])
+        chunks = []
+        for doc_text, metadata in zip(
+            results["documents"][0], results["metadatas"][0]
+        ):
+            title = metadata.get("title", "Неизвестный документ")
+            chunks.append(f"[Документ: {title}]\n{doc_text}")
+
+        return "\n---\n".join(chunks)
 
 
 rag_service = RAGService()
