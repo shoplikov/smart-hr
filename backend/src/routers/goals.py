@@ -1,138 +1,170 @@
-import logging
+import uuid
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import select, update
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.core.database import get_db
-from src.models.llm_schemas import GoalGenerationResult, SmartEvaluationResult
-from src.models.schema import Employee, Goal
-from src.schemas.api import (
-    EvaluateGoalRequest,
-    GenerateGoalsRequest,
-    GoalCreate,
-    GoalResponse,
-    GoalStatusUpdate,
-    GoalUpdate
-)
-from src.services.goal_generator import goal_generator
-from src.services.smart_evaluator import smart_evaluator
+from src.models.schema import Goal, GoalStatusEnum, QuarterEnum
 
-logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/goals", tags=["Goals"])
 
 
-@router.post("/", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
-async def create_goal(goal_in: GoalCreate, db: AsyncSession = Depends(get_db)):
-    """Создание новой цели сотрудника."""
-    # Verify employee exists
-    employee = await db.get(Employee, goal_in.employee_id)
-    if not employee:
-        raise HTTPException(status_code=404, detail="Сотрудник не найден")
+# --- Pydantic Schemas ---
+class GoalCreate(BaseModel):
+    title: str
+    description: str
+    quarter: int
+    year: int
+    employee_id: int
+    department_id: int = 1  # Default to 1 for the demo
 
-    new_goal = Goal(**goal_in.model_dump(), status="DRAFT")
+
+class GoalUpdate(BaseModel):
+    title: str
+    description: str
+
+
+class GoalStatusUpdate(BaseModel):
+    status: str
+
+
+class GoalResponse(BaseModel):
+    id: str  # React expects a string, DB uses UUID
+    title: str
+    description: str
+    quarter: int
+    year: int
+    employee_id: int
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
+# --- Endpoints ---
+@router.post("/", response_model=GoalResponse)
+async def create_goal(goal: GoalCreate, db: AsyncSession = Depends(get_db)):
+    q_enum = getattr(QuarterEnum, f"Q{goal.quarter}", QuarterEnum.Q1)
+
+    new_goal = Goal(
+        employee_id=goal.employee_id,
+        department_id=goal.department_id,
+        goal_text=goal.title,  # Translate title -> goal_text
+        metric=goal.description,  # Translate description -> metric
+        quarter=q_enum,
+        year=goal.year,
+        status=GoalStatusEnum.draft,
+    )
     db.add(new_goal)
     await db.commit()
     await db.refresh(new_goal)
-    return new_goal
+
+    return {
+        "id": str(new_goal.goal_id),
+        "title": new_goal.goal_text,
+        "description": new_goal.metric or "",
+        "quarter": goal.quarter,
+        "year": new_goal.year,
+        "employee_id": new_goal.employee_id,
+        "status": new_goal.status.value.upper(),
+    }
 
 
-@router.get("/employee/{employee_id}", response_model=list[GoalResponse])
+@router.get("/employee/{employee_id}", response_model=List[GoalResponse])
 async def get_employee_goals(employee_id: int, db: AsyncSession = Depends(get_db)):
-    """Получение списка целей конкретного сотрудника."""
-    result = await db.execute(select(Goal).where(Goal.employee_id == employee_id))
+    query = select(Goal).where(Goal.employee_id == employee_id)
+    result = await db.execute(query)
     goals = result.scalars().all()
-    return goals
 
-
-@router.post("/ai/evaluate", response_model=SmartEvaluationResult)
-async def evaluate_goal_smart(request: EvaluateGoalRequest):
-    """Оценка цели по критериям SMART с помощью AI."""
-    try:
-        return await smart_evaluator.evaluate_goal(
-            title=request.title, description=request.description
+    response_list = []
+    for g in goals:
+        q_int = int(g.quarter.value[-1]) if g.quarter else 1
+        response_list.append(
+            {
+                "id": str(g.goal_id),
+                "title": g.goal_text,
+                "description": g.metric or "",
+                "quarter": q_int,
+                "year": g.year,
+                "employee_id": g.employee_id,
+                "status": g.status.value.upper(),
+            }
         )
-    except Exception as e:
-        logger.error(f"Error evaluating goal: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка при оценке цели AI")
-
-
-@router.post("/ai/generate", response_model=GoalGenerationResult)
-async def generate_goals_smart(request: GenerateGoalsRequest):
-    """Генерация стратегических целей на основе роли и отдела (RAG + AI)."""
-    try:
-        return await goal_generator.generate_goals(
-            role=request.role,
-            department=request.department,
-            quarter=request.quarter,
-            year=request.year,
-        )
-    except Exception as e:
-        logger.error(f"Error generating goals: {e}")
-        raise HTTPException(status_code=500, detail="Ошибка при генерации целей AI")
+    return response_list
 
 
 @router.patch("/{goal_id}/status", response_model=GoalResponse)
 async def update_goal_status(
-    goal_id: int, status_update: GoalStatusUpdate, db: AsyncSession = Depends(get_db)
+    goal_id: uuid.UUID,
+    status_update: GoalStatusUpdate,
+    db: AsyncSession = Depends(get_db),
 ):
-    """Обновление целей hr-ом"""
-    query = (
-        update(Goal)
-        .where(Goal.id == goal_id)
-        .values(status=status_update.status)
-        .returning(Goal)
-    )
+    db_status = status_update.status.lower()
+    query = select(Goal).where(Goal.goal_id == goal_id)
     result = await db.execute(query)
-    updated_goal = result.scalars().first()
+    goal = result.scalars().first()
 
-    if not updated_goal:
+    if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
+    goal.status = db_status
     await db.commit()
-    return updated_goal
+    await db.refresh(goal)
+
+    q_int = int(goal.quarter.value[-1]) if goal.quarter else 1
+    return {
+        "id": str(goal.goal_id),
+        "title": goal.goal_text,
+        "description": goal.metric or "",
+        "quarter": q_int,
+        "year": goal.year,
+        "employee_id": goal.employee_id,
+        "status": goal.status.value.upper(),
+    }
 
 
 @router.put("/{goal_id}", response_model=GoalResponse)
 async def update_goal(
-    goal_id: int, goal_update: GoalUpdate, db: AsyncSession = Depends(get_db)
+    goal_id: uuid.UUID, goal_update: GoalUpdate, db: AsyncSession = Depends(get_db)
 ):
-    """Updates a draft goal. Fails if already approved."""
-    query = select(Goal).where(Goal.id == goal_id)
+    query = select(Goal).where(Goal.goal_id == goal_id)
     result = await db.execute(query)
     goal = result.scalars().first()
 
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
-    if goal.status != "DRAFT":
-        raise HTTPException(
-            status_code=400, detail="Cannot edit an approved goal. It is locked."
-        )
+    if goal.status != GoalStatusEnum.draft:
+        raise HTTPException(status_code=400, detail="Cannot edit an approved goal.")
 
-    goal.title = goal_update.title
-    goal.description = goal_update.description
-    if goal_update.quarter:
-        goal.quarter = goal_update.quarter
-    if goal_update.year:
-        goal.year = goal_update.year
-
+    goal.goal_text = goal_update.title
+    goal.metric = goal_update.description
     await db.commit()
     await db.refresh(goal)
-    return goal
+
+    q_int = int(goal.quarter.value[-1]) if goal.quarter else 1
+    return {
+        "id": str(goal.goal_id),
+        "title": goal.goal_text,
+        "description": goal.metric or "",
+        "quarter": q_int,
+        "year": goal.year,
+        "employee_id": goal.employee_id,
+        "status": goal.status.value.upper(),
+    }
 
 
 @router.delete("/{goal_id}", status_code=204)
-async def delete_goal(goal_id: int, db: AsyncSession = Depends(get_db)):
-    """Deletes a draft goal. Fails if already approved."""
-    query = select(Goal).where(Goal.id == goal_id)
+async def delete_goal(goal_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    query = select(Goal).where(Goal.goal_id == goal_id)
     result = await db.execute(query)
     goal = result.scalars().first()
 
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
-    if goal.status != "DRAFT":
-        raise HTTPException(
-            status_code=400, detail="Cannot delete an approved goal. It is locked."
-        )
+    if goal.status != GoalStatusEnum.draft:
+        raise HTTPException(status_code=400, detail="Cannot delete an approved goal.")
 
     await db.delete(goal)
     await db.commit()
