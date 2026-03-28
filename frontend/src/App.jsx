@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import EmployeeView from './views/EmployeeView';
 import ManagerView from './views/ManagerView';
 import { UserProvider, useUser } from './UserContext';
@@ -6,8 +6,7 @@ import { UserPicker } from './components/UserPicker';
 import { ToastProvider } from './components/shared';
 
 function AppShell() {
-  const { employee, logout } = useUser();
-  const [currentView, setCurrentView] = useState('employee');
+  const { employee, role, logout } = useUser();
 
   if (!employee) return <UserPicker />;
 
@@ -18,26 +17,9 @@ function AppShell() {
           <div className="flex items-center justify-between h-14">
             <div className="flex items-center gap-1">
               <span className="font-bold text-lg text-indigo-600 tracking-tight mr-6">HR ИИ</span>
-              <button
-                onClick={() => setCurrentView('employee')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  currentView === 'employee'
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Сотрудник
-              </button>
-              <button
-                onClick={() => setCurrentView('manager')}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition ${
-                  currentView === 'manager'
-                    ? 'bg-indigo-50 text-indigo-700'
-                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-                }`}
-              >
-                Руководитель
-              </button>
+              <span className="px-4 py-2 rounded-lg text-sm font-medium bg-indigo-50 text-indigo-700">
+                {role === 'manager' ? 'Руководитель (HR)' : 'Сотрудник'}
+              </span>
             </div>
             <div className="flex items-center gap-4">
               <div className="text-right">
@@ -56,7 +38,7 @@ function AppShell() {
       </nav>
 
       <main>
-        {currentView === 'employee' ? <EmployeeView /> : <ManagerView />}
+        {role === 'manager' ? <ManagerView /> : <EmployeeView />}
       </main>
     </div>
   );

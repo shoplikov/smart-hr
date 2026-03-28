@@ -13,6 +13,7 @@ router = APIRouter(prefix="/api/v1", tags=["Employees & Departments"])
 @router.get("/employees")
 async def list_employees(
     manager_id: Optional[int] = None,
+    is_manager: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
 ):
     query = (
@@ -33,6 +34,11 @@ async def list_employees(
 
     if manager_id is not None:
         query = query.where(Employee.manager_id == manager_id)
+
+    if is_manager is True:
+        query = query.where(Employee.id.in_(select(Employee.manager_id).where(Employee.manager_id.isnot(None))))
+    elif is_manager is False:
+        query = query.where(Employee.id.notin_(select(Employee.manager_id).where(Employee.manager_id.isnot(None))))
 
     query = query.order_by(Department.name, Employee.full_name)
     result = await db.execute(query)

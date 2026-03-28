@@ -91,7 +91,7 @@ const BatchSummary = ({ data }) => {
     );
 };
 
-const EmployeeSidebar = ({ employees, selectedId, onSelect, loading, search, onSearchChange, showAll, onToggleShowAll, hasSubordinates }) => (
+const EmployeeSidebar = ({ employees, selectedId, onSelect, loading, search, onSearchChange }) => (
     <aside className="w-72 shrink-0 bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-fit sticky top-4 max-h-[calc(100vh-6rem)]">
         <div className="p-3 border-b border-gray-100 space-y-2">
             <div className="relative">
@@ -106,22 +106,6 @@ const EmployeeSidebar = ({ employees, selectedId, onSelect, loading, search, onS
                     className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                 />
             </div>
-            {hasSubordinates && (
-                <div className="flex rounded-lg bg-gray-100 p-0.5">
-                    <button
-                        onClick={() => { if (showAll) onToggleShowAll(); }}
-                        className={`flex-1 text-xs font-medium py-1.5 rounded-md transition ${!showAll ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Мои
-                    </button>
-                    <button
-                        onClick={() => { if (!showAll) onToggleShowAll(); }}
-                        className={`flex-1 text-xs font-medium py-1.5 rounded-md transition ${showAll ? 'bg-white shadow-sm text-indigo-700' : 'text-gray-500 hover:text-gray-700'}`}
-                    >
-                        Все
-                    </button>
-                </div>
-            )}
         </div>
         <div className="overflow-y-auto flex-1">
             {loading ? (
@@ -129,7 +113,7 @@ const EmployeeSidebar = ({ employees, selectedId, onSelect, loading, search, onS
                     {[1,2,3].map(i => <div key={i} className="animate-pulse h-14 bg-gray-100 rounded-lg" />)}
                 </div>
             ) : employees.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-8">Нет сотрудников</p>
+                <p className="text-sm text-gray-400 text-center py-8">У вас нет подчиненных сотрудников</p>
             ) : (
                 <div className="p-2 space-y-1">
                     {employees.map(emp => (
@@ -221,8 +205,6 @@ export const ManagerView = () => {
     const user = useUser();
 
     const [subordinates, setSubordinates] = useState([]);
-    const [allEmployees, setAllEmployees] = useState([]);
-    const [showAll, setShowAll] = useState(false);
     const [selectedSubId, setSelectedSubId] = useState(null);
     const [subsLoading, setSubsLoading] = useState(true);
     const [sidebarSearch, setSidebarSearch] = useState('');
@@ -237,18 +219,10 @@ export const ManagerView = () => {
     useEffect(() => {
         const load = async () => {
             try {
-                const [subs, all] = await Promise.all([
-                    api.getEmployees(user.employee.id),
-                    api.getEmployees(),
-                ]);
+                const subs = await api.getEmployees(user.employee.id);
                 setSubordinates(subs);
-                setAllEmployees(all.filter(e => e.id !== user.employee.id));
                 if (subs.length > 0) {
                     setSelectedSubId(subs[0].id);
-                } else {
-                    setShowAll(true);
-                    const others = all.filter(e => e.id !== user.employee.id);
-                    if (others.length > 0) setSelectedSubId(others[0].id);
                 }
             } catch (err) {
                 console.error('Failed to load employees', err);
@@ -280,29 +254,18 @@ export const ManagerView = () => {
     };
 
     const enrichedList = useMemo(() => {
-        const base = showAll ? allEmployees : subordinates;
         const q = sidebarSearch.toLowerCase().trim();
         const filtered = q
-            ? base.filter(e =>
-                e.full_name.toLowerCase().includes(q) ||
-                e.position_name.toLowerCase().includes(q) ||
-                e.department_name.toLowerCase().includes(q)
+            ? subordinates.filter(e =>
+                (e.full_name || '').toLowerCase().includes(q) ||
+                (e.position_name || '').toLowerCase().includes(q) ||
+                (e.department_name || '').toLowerCase().includes(q)
             )
-            : base;
+            : subordinates;
         return filtered;
-    }, [showAll, allEmployees, subordinates, sidebarSearch]);
+    }, [subordinates, sidebarSearch]);
 
-    const selectedSub = enrichedList.find(s => s.id === selectedSubId)
-        || allEmployees.find(s => s.id === selectedSubId);
-
-    const handleToggleShowAll = () => {
-        const next = !showAll;
-        setShowAll(next);
-        const list = next ? allEmployees : subordinates;
-        if (list.length > 0 && !list.find(s => s.id === selectedSubId)) {
-            setSelectedSubId(list[0].id);
-        }
-    };
+    const selectedSub = enrichedList.find(s => s.id === selectedSubId) || subordinates.find(s => s.id === selectedSubId);
 
     const handleBatchEvaluate = async () => {
         if (!selectedSubId) return;
@@ -349,9 +312,6 @@ export const ManagerView = () => {
                     loading={subsLoading}
                     search={sidebarSearch}
                     onSearchChange={setSidebarSearch}
-                    showAll={showAll}
-                    onToggleShowAll={handleToggleShowAll}
-                    hasSubordinates={subordinates.length > 0}
                 />
 
                 <div className="flex-1 min-w-0">

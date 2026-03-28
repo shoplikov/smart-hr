@@ -17,10 +17,6 @@ export const Dashboard = ({ departmentId }) => {
         { id: 'training_coverage_percent', label: 'Охват обучением (%)' }
     ];
 
-    useEffect(() => {
-        if (departmentId) fetchMetrics();
-    }, [selectedMetric, departmentId, fetchMetrics]);
-
     const fetchMetrics = useCallback(async () => {
         setLoading(true);
         try {
@@ -34,6 +30,12 @@ export const Dashboard = ({ departmentId }) => {
             setLoading(false);
         }
     }, [departmentId, selectedMetric]);
+
+    useEffect(() => {
+        if (departmentId) fetchMetrics();
+    }, [selectedMetric, departmentId, fetchMetrics]);
+
+
 
     return (
         <div className="bg-white shadow rounded-lg p-6 border border-gray-200 mb-8">

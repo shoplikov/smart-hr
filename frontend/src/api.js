@@ -1,9 +1,12 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
 
 export const api = {
-    getEmployees: async (managerId) => {
-        const params = managerId != null ? `?manager_id=${managerId}` : '';
-        const response = await fetch(`${API_BASE}/employees${params}`);
+    getEmployees: async (managerId, isManager) => {
+        const params = new URLSearchParams();
+        if (managerId != null) params.append('manager_id', managerId);
+        if (isManager != null) params.append('is_manager', isManager);
+        const q = params.toString();
+        const response = await fetch(`${API_BASE}/employees${q ? '?' + q : ''}`);
         if (!response.ok) throw new Error('Ошибка при загрузке списка сотрудников');
         return response.json();
     },

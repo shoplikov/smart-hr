@@ -9,17 +9,25 @@ function getCurrentQuarter() {
 
 export function UserProvider({ children }) {
     const [employee, setEmployee] = useState(null);
+    const [role, setRole] = useState(null);
 
     const value = useMemo(() => {
         const now = new Date();
         return {
             employee,
+            role,
             quarter: getCurrentQuarter(),
             year: now.getFullYear(),
-            login: (emp) => setEmployee(emp),
-            logout: () => setEmployee(null),
+            login: (emp, selectedRole) => {
+                setEmployee(emp);
+                setRole(selectedRole);
+            },
+            logout: () => {
+                setEmployee(null);
+                setRole(null);
+            },
         };
-    }, [employee]);
+    }, [employee, role]);
 
     return (
         <UserContext.Provider value={value}>

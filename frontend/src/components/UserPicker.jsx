@@ -5,15 +5,18 @@ import { useUser } from '../UserContext';
 export const UserPicker = () => {
     const { login } = useUser();
     const [employees, setEmployees] = useState([]);
+    const [loginMode, setLoginMode] = useState('worker');
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
 
     useEffect(() => {
-        api.getEmployees()
+        setLoading(true);
+        const isManagerFlag = loginMode === 'manager' ? true : false;
+        api.getEmployees(null, isManagerFlag)
             .then(setEmployees)
             .catch((err) => console.error('Failed to load employees', err))
             .finally(() => setLoading(false));
-    }, []);
+    }, [loginMode]);
 
     const grouped = useMemo(() => {
         const q = search.toLowerCase().trim();
@@ -59,7 +62,22 @@ export const UserPicker = () => {
                         </svg>
                     </div>
                     <h1 className="text-3xl font-bold text-gray-900 mb-2">HR ИИ-Платформа</h1>
-                    <p className="text-gray-500">Выберите сотрудника для входа в систему</p>
+                    <p className="text-gray-500 mb-6">Выберите профиль для входа в систему</p>
+                    
+                    <div className="inline-flex p-1 bg-white border border-gray-200 rounded-xl shadow-sm">
+                        <button 
+                            onClick={() => setLoginMode('worker')}
+                            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition ${loginMode === 'worker' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
+                        >
+                            Сотрудник
+                        </button>
+                        <button 
+                            onClick={() => setLoginMode('manager')}
+                            className={`px-6 py-2.5 rounded-lg text-sm font-semibold transition ${loginMode === 'manager' ? 'bg-indigo-600 text-white shadow' : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'}`}
+                        >
+                            Руководитель (HR)
+                        </button>
+                    </div>
                 </div>
 
                 <div className="max-w-md mx-auto mb-10">
@@ -90,7 +108,7 @@ export const UserPicker = () => {
                                     {emps.map((emp) => (
                                         <button
                                             key={emp.id}
-                                            onClick={() => login(emp)}
+                                            onClick={() => login(emp, loginMode)}
                                             className="flex items-center gap-3 text-left p-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-indigo-300 transition group"
                                         >
                                             <div className="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
