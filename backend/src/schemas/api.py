@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Optional
 
 from pydantic import BaseModel, Field
@@ -30,6 +31,8 @@ class GoalResponse(BaseModel):
     year: int
     employee_id: int
     status: str
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
 
     model_config = {"from_attributes": True}
 

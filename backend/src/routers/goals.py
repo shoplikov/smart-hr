@@ -57,6 +57,8 @@ def _goal_to_dict(g: Goal) -> dict:
         "year": g.year,
         "employee_id": g.employee_id,
         "status": g.status.value.upper(),
+        "created_at": g.created_at.isoformat() if g.created_at else None,
+        "updated_at": g.updated_at.isoformat() if g.updated_at else None,
     }
 
 
@@ -399,7 +401,11 @@ async def create_goal(goal: GoalCreate, db: AsyncSession = Depends(get_db)):
 
 @router.get("/employee/{employee_id}", response_model=List[GoalResponse])
 async def get_employee_goals(employee_id: int, db: AsyncSession = Depends(get_db)):
-    query = select(Goal).where(Goal.employee_id == employee_id)
+    query = (
+        select(Goal)
+        .where(Goal.employee_id == employee_id)
+        .order_by(Goal.updated_at.desc())
+    )
     result = await db.execute(query)
     goals = result.scalars().all()
     return [_goal_to_dict(g) for g in goals]

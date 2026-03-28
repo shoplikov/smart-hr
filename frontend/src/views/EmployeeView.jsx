@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { SmartScoreCard } from '../components/SmartScoreCard';
 import { GoalSuggestions } from '../components/GoalSuggestions';
-import { GoalCard } from '../components/GoalCard';
-import { GoalCardSkeleton } from '../components/shared';
 import { api } from '../api';
 import { useUser } from '../UserContext';
 
@@ -13,26 +11,24 @@ export const EmployeeView = () => {
     const [evaluation, setEvaluation] = useState(null);
     const [evaluating, setEvaluating] = useState(false);
     const [saving, setSaving] = useState(false);
-
-    const [myGoals, setMyGoals] = useState([]);
-    const [loadingGoals, setLoadingGoals] = useState(true);
     const [editingGoalId, setEditingGoalId] = useState(null);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
-    const fetchMyGoals = useCallback(async () => {
-        setLoadingGoals(true);
-        try {
-            const goals = await api.getEmployeeGoals(user.employee.id);
-            setMyGoals(goals.sort((a, b) => (a.status === 'DRAFT' ? -1 : (b.status === 'DRAFT' ? 1 : 0))));
-        } catch (error) {
-            console.error('Failed to fetch my goals', error);
-        } finally {
-            setLoadingGoals(false);
-        }
-    }, [user.employee.id]);
-
+    // Listen for editGoal events from MyGoalsView
     useEffect(() => {
-        fetchMyGoals();
-    }, [fetchMyGoals]);
+        const handler = (e) => {
+            const goal = e.detail;
+            if (goal) {
+                setEditingGoalId(goal.id);
+                setDraftGoalText(goal.goal_text);
+                setDraftMetric(goal.metric || '');
+                setEvaluation(null);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        };
+        window.addEventListener('editGoal', handler);
+        return () => window.removeEventListener('editGoal', handler);
+    }, []);
 
     const handleEvaluate = async () => {
         if (!draftGoalText) return;
@@ -50,6 +46,7 @@ export const EmployeeView = () => {
     const handleSaveGoal = async () => {
         if (!draftGoalText) return;
         setSaving(true);
+        setSaveSuccess(false);
         try {
             if (editingGoalId) {
                 await api.updateGoal(editingGoalId, { goal_text: draftGoalText, metric: draftMetric || null });
@@ -64,30 +61,12 @@ export const EmployeeView = () => {
                 });
             }
             resetForm();
-            await fetchMyGoals();
+            setSaveSuccess(true);
+            setTimeout(() => setSaveSuccess(false), 3000);
         } catch {
             // handled silently
         } finally {
             setSaving(false);
-        }
-    };
-
-    const handleEditClick = (goal) => {
-        setEditingGoalId(goal.id);
-        setDraftGoalText(goal.goal_text);
-        setDraftMetric(goal.metric || '');
-        setEvaluation(null);
-        window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-
-    const handleDeleteClick = async (goalId) => {
-        if (!window.confirm('Вы уверены, что хотите удалить эту цель?')) return;
-        try {
-            await api.deleteGoal(goalId);
-            await fetchMyGoals();
-            if (editingGoalId === goalId) resetForm();
-        } catch {
-            // handled silently
         }
     };
 
@@ -106,14 +85,22 @@ export const EmployeeView = () => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    const goalCountWarning = myGoals.length > 0 && myGoals.length < 3;
-
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">Кабинет сотрудника</h1>
                 <p className="mt-1 text-sm text-gray-500">Планирование и оценка целей с помощью AI</p>
             </div>
+
+            {/* Success toast */}
+            {saveSuccess && (
+                <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 font-medium flex items-center gap-2 animate-fade-in">
+                    <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Цель успешно сохранена! Перейдите на вкладку «Мои цели» чтобы увидеть её.
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
                 {/* Goal form */}
@@ -251,55 +238,6 @@ export const EmployeeView = () => {
                 <div>
                     <GoalSuggestions onSelectGoal={handleApplySuggestion} />
                 </div>
-            </div>
-
-            {/* Goals list */}
-            <div>
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-bold text-gray-900">Мои цели</h3>
-                    {myGoals.length > 0 && (
-                        <span className="text-sm text-gray-400">{myGoals.length} целей</span>
-                    )}
-                </div>
-
-                {goalCountWarning && (
-                    <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 font-medium">
-                        {`У вас ${myGoals.length} цел${myGoals.length === 1 ? 'ь' : 'и'} — рекомендуется минимум 3 для полноценного набора.`}
-                    </div>
-                )}
-
-                {loadingGoals ? (
-                    <div className="space-y-4">
-                        {[1,2,3].map(i => <GoalCardSkeleton key={i} />)}
-                    </div>
-                ) : myGoals.length === 0 ? (
-                    <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-                        <div className="text-gray-400 mb-2">
-                            <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                            </svg>
-                            У вас пока нет сохраненных целей
-                        </div>
-                        <p className="text-sm text-gray-400">Создайте новую цель с помощью формы выше</p>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {myGoals.map(goal => (
-                            <GoalCard
-                                key={goal.id}
-                                goal={goal}
-                                mode="employee"
-                                onEdit={handleEditClick}
-                                onDelete={handleDeleteClick}
-                                onApplyImproved={(text) => {
-                                    setDraftGoalText(text);
-                                    setEvaluation(null);
-                                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                                }}
-                            />
-                        ))}
-                    </div>
-                )}
             </div>
         </div>
     );
