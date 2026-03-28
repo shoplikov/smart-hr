@@ -1,5 +1,8 @@
 import logging
-from openai import AsyncOpenAI
+
+from langfuse import observe
+from langfuse.openai import AsyncOpenAI
+from openai.lib._parsing._completions import type_to_response_format_param
 
 from src.core.config import settings
 from src.core.prompt_manager import prompt_manager
@@ -16,6 +19,7 @@ class GoalGeneratorService:
             "gpt-4o-mini"
         )
 
+    @observe()
     async def generate_goals(
         self, role: str, department: str, quarter: int, year: int
     ) -> GoalGenerationResult:
@@ -44,17 +48,19 @@ class GoalGeneratorService:
             context_block=context_block,
         )
 
-        response = await self.client.beta.chat.completions.parse(
+        response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            response_format=GoalGenerationResult,
+            response_format=type_to_response_format_param(GoalGenerationResult),
             temperature=0.6,
         )
 
-        return response.choices[0].message.parsed
+        return GoalGenerationResult.model_validate_json(
+            response.choices[0].message.content
+        )
 
 
 goal_generator = GoalGeneratorService()

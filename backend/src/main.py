@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from langfuse import get_client
 
 from src.core.config import settings
 from src.core.database import AsyncSessionLocal
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
             f"ChromaDB already has {rag_service.collection.count()} chunks, skipping ingestion."
         )
     yield
+    get_client().flush()
 
 
 def create_app() -> FastAPI:

@@ -51,6 +51,9 @@ services:
     environment:
       - DATABASE_URL=postgresql+asyncpg://hr_user:hr_password@db:5432/hr_db
       - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - LANGFUSE_SECRET_KEY=${LANGFUSE_SECRET_KEY}
+      - LANGFUSE_PUBLIC_KEY=${LANGFUSE_PUBLIC_KEY}
+      - LANGFUSE_BASE_URL=${LANGFUSE_BASE_URL:-https://cloud.langfuse.com}
       - CHROMA_HOST=chroma
       - CHROMA_PORT=8000
     depends_on:

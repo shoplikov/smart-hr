@@ -5,7 +5,8 @@ from typing import List
 
 import chromadb
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from openai import AsyncOpenAI
+from langfuse import observe
+from langfuse.openai import AsyncOpenAI
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -37,12 +38,14 @@ class RAGService:
             chunk_size=2000, chunk_overlap=200, separators=["\n\n", "\n", ".", " ", ""]
         )
 
+    @observe()
     async def _generate_embeddings(self, texts: List[str]) -> List[List[float]]:
         response = await self.openai_client.embeddings.create(
             input=texts, model=self.embedding_model
         )
         return [data.embedding for data in sorted(response.data, key=lambda x: x.index)]
 
+    @observe()
     async def ingest_documents(self, db_session: AsyncSession) -> None:
         logger.info("Starting RAG document ingestion via OpenAI...")
 
@@ -84,6 +87,7 @@ class RAGService:
         )
         logger.info(f"Successfully ingested {len(ids)} document chunks.")
 
+    @observe()
     async def search_relevant_context(
         self, query: str, top_k: int = 3, department_scope: str = None
     ) -> str:
