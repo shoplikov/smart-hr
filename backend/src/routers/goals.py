@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from src.core.database import get_db
 from src.models.schema import (
@@ -21,6 +22,7 @@ from src.models.schema import (
     KpiCatalog,
     Project,
     EmployeeProject,
+    Employee,
     Department,
     QuarterEnum,
     ReviewVerdictEnum,
@@ -117,6 +119,21 @@ async def _get_goal_context(
     if not goal_obj and goal_id:
         goal_obj = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
 
+    if goal_obj and not employee_id:
+        employee_id = goal_obj.employee_id
+
+    # 1a. Fetch employee's role/position — essential for relevant evaluations
+    if employee_id:
+        emp_result = await db.execute(
+            select(Employee).where(Employee.id == employee_id).options(selectinload(Employee.position))
+        )
+        emp = emp_result.scalars().first()
+        if emp and emp.position:
+            role_str = emp.position.name
+            if emp.position.grade:
+                role_str += f" ({emp.position.grade})"
+            parts.append(f"Должность сотрудника: {role_str}")
+
     # 1b. If goal has a KPI metric, include it in context
     if goal_obj and goal_obj.metric:
         kpi = await db.get(KpiCatalog, goal_obj.metric)
@@ -130,8 +147,6 @@ async def _get_goal_context(
             if project:
                 parts.append(f"Проект: {project.name}. Описание: {project.description or 'Нет описания'}")
                 return "\n".join(parts) if parts else "Общий корпоративный контекст"
-        # If no project linked directly, fall back to employee context
-        employee_id = goal_obj.employee_id
 
     # 3. If we have an employee_id, look up all their assigned projects
     if employee_id:
@@ -144,14 +159,15 @@ async def _get_goal_context(
         projects = result.scalars().all()
         if projects:
             proj_list = "\n".join([f"- {p.name}: {p.description or 'Без описания'}" for p in projects])
-            parts.append(f"Проекты сотрудника (Employee ID: {employee_id}):\n{proj_list}")
+            parts.append(f"Проекты сотрудника:\n{proj_list}")
             ctx = "\n".join(parts)
-            logger.info(f"Retrieved employee projects context: {ctx[:200]}...")
+            logger.info(f"Retrieved employee context: {ctx[:300]}...")
             return ctx
 
         # 4. Fallback to department if projects are still not found
-        if goal_obj and goal_obj.department_id:
-            dept = await db.get(Department, goal_obj.department_id)
+        dept_id = goal_obj.department_id if goal_obj else None
+        if dept_id:
+            dept = await db.get(Department, dept_id)
             if dept:
                 parts.append(f"Отдел: {dept.name}")
                 return "\n".join(parts) if parts else "Общий корпоративный контекст"

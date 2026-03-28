@@ -35,3 +35,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+
+DB_Schema_Knowledge.md
+DB_view.md 

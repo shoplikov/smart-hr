@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import React, { useState, useRef, useEffect, createContext, useContext, useCallback } from 'react';
+import React, { useState, createContext, useContext, useCallback } from 'react';
 import { STATUS_CONFIG, VERDICT_LABELS } from '../constants';
 
 export const GoalStatusBadge = ({ status }) => {
@@ -23,21 +23,6 @@ export const VerdictBadge = ({ verdict }) => {
 
 export const Expandable = ({ title, badge, defaultOpen = false, children }) => {
     const [open, setOpen] = useState(defaultOpen);
-    const contentRef = useRef(null);
-    const [height, setHeight] = useState(defaultOpen ? 'auto' : '0px');
-
-    useEffect(() => {
-        if (open && contentRef.current) {
-            setHeight(`${contentRef.current.scrollHeight}px`);
-            const timer = setTimeout(() => setHeight('auto'), 300);
-            return () => clearTimeout(timer);
-        } else {
-            if (contentRef.current) {
-                setHeight(`${contentRef.current.scrollHeight}px`);
-                requestAnimationFrame(() => setHeight('0px'));
-            }
-        }
-    }, [open]);
 
     return (
         <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -57,11 +42,12 @@ export const Expandable = ({ title, badge, defaultOpen = false, children }) => {
                 </div>
             </button>
             <div
-                ref={contentRef}
-                style={{ maxHeight: height }}
-                className="overflow-hidden transition-all duration-300 ease-in-out"
+                className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+                style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
             >
-                <div className="p-4">{children}</div>
+                <div className="overflow-hidden">
+                    <div className="p-4">{children}</div>
+                </div>
             </div>
         </div>
     );

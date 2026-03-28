@@ -9,7 +9,7 @@ const SparkleIcon = () => (
 );
 
 const SuggestionCard = ({ goal, index, onSelect }) => (
-    <div className="group bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-all overflow-hidden">
+    <div className="group bg-white rounded-xl border border-gray-200 hover:border-indigo-300 hover:shadow-md transition-colors transition-shadow overflow-clip">
         <div className="p-4">
             <div className="flex items-start gap-3 mb-3">
                 <span className="shrink-0 w-7 h-7 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center text-xs font-bold">
@@ -96,7 +96,7 @@ export const GoalSuggestions = ({ onSelectGoal }) => {
     const goalsList = suggestions?.goals || [];
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-clip">
             {/* Header */}
             <div className="px-6 py-4 bg-gradient-to-r from-violet-50 to-indigo-50 border-b border-gray-200">
                 <div className="flex items-center gap-2.5">
