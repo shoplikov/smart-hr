@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SmartScoreCard } from '../components/SmartScoreCard';
 import { GoalSuggestions } from '../components/GoalSuggestions';
 import { GoalCard } from '../components/GoalCard';
@@ -18,21 +18,21 @@ export const EmployeeView = () => {
     const [loadingGoals, setLoadingGoals] = useState(true);
     const [editingGoalId, setEditingGoalId] = useState(null);
 
-    useEffect(() => {
-        fetchMyGoals();
-    }, [user.employee.id]);
-
-    const fetchMyGoals = async () => {
+    const fetchMyGoals = useCallback(async () => {
         setLoadingGoals(true);
         try {
             const goals = await api.getEmployeeGoals(user.employee.id);
-            setMyGoals(goals.sort((a, b) => a.status === 'DRAFT' ? -1 : 1));
+            setMyGoals(goals.sort((a, b) => (a.status === 'DRAFT' ? -1 : (b.status === 'DRAFT' ? 1 : 0))));
         } catch (error) {
             console.error('Failed to fetch my goals', error);
         } finally {
             setLoadingGoals(false);
         }
-    };
+    }, [user.employee.id]);
+
+    useEffect(() => {
+        fetchMyGoals();
+    }, [fetchMyGoals]);
 
     const handleEvaluate = async () => {
         if (!draftGoalText) return;

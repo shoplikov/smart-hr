@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis } from 'recharts';
 import { Dashboard } from '../components/Dashboard';
 import { GoalCard } from '../components/GoalCard';
-import { GoalStatusBadge, GoalCardSkeleton, LOCKED_STATUSES } from '../components/shared';
+import { GoalStatusBadge, GoalCardSkeleton } from '../components/shared';
 import { api } from '../api';
 import { useUser } from '../UserContext';
 
@@ -271,7 +271,7 @@ export const ManagerView = () => {
         setLoading(true);
         try {
             const data = await api.getEmployeeGoals(employeeId);
-            setTeamGoals(data.sort((a, b) => a.status === 'DRAFT' ? -1 : 1));
+            setTeamGoals(data.sort((a, b) => (a.status === 'DRAFT' ? -1 : (b.status === 'DRAFT' ? 1 : 0))));
         } catch (err) {
             console.error('Failed to fetch goals', err);
         } finally {

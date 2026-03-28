@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../api';
 
@@ -19,9 +19,9 @@ export const Dashboard = ({ departmentId }) => {
 
     useEffect(() => {
         if (departmentId) fetchMetrics();
-    }, [selectedMetric, departmentId]);
+    }, [selectedMetric, departmentId, fetchMetrics]);
 
-    const fetchMetrics = async () => {
+    const fetchMetrics = useCallback(async () => {
         setLoading(true);
         try {
             const response = await api.getDepartmentKpi(departmentId, selectedMetric);
@@ -33,7 +33,7 @@ export const Dashboard = ({ departmentId }) => {
         } finally {
             setLoading(false);
         }
-    };
+    }, [departmentId, selectedMetric]);
 
     return (
         <div className="bg-white shadow rounded-lg p-6 border border-gray-200 mb-8">

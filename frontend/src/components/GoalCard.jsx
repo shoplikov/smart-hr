@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../api';
-import { GoalStatusBadge, Expandable, VerdictBadge, LOCKED_STATUSES } from './shared';
-
+import { GoalStatusBadge, Expandable, VerdictBadge } from './shared';
+import { LOCKED_STATUSES } from '../constants';
 const CRITERIA_LABELS = {
     specific: 'S — Конкретность',
     measurable: 'M — Измеримость',
@@ -140,16 +140,15 @@ export const GoalCard = ({
     const [evaluation, setEvaluation] = useState(null);
     const [evalLoading, setEvalLoading] = useState(false);
     const [reviews, setReviews] = useState([]);
-    const [reviewsLoaded, setReviewsLoaded] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
         api.getLatestEvaluation(goal.id).then(data => {
             if (!cancelled && data) setEvaluation(data);
-        }).catch(() => {});
+        }).catch((err) => console.error(err));
         api.getReviews(goal.id).then(data => {
-            if (!cancelled) { setReviews(data); setReviewsLoaded(true); }
-        }).catch(() => {});
+            if (!cancelled) { setReviews(data); }
+        }).catch((err) => console.error(err));
         return () => { cancelled = true; };
     }, [goal.id]);
 
@@ -169,7 +168,9 @@ export const GoalCard = ({
         try {
             const data = await api.getReviews(goal.id);
             setReviews(data);
-        } catch {}
+        } catch (error) {
+            console.error(error);
+        }
     };
 
     const isLocked = LOCKED_STATUSES.includes(goal.status);
