@@ -1,8 +1,12 @@
 import asyncio
+import logging
 import uuid
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+
+logger = logging.getLogger(__name__)
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -14,6 +18,9 @@ from src.models.schema import (
     GoalEventTypeEnum,
     GoalReview,
     GoalStatusEnum,
+    Project,
+    EmployeeProject,
+    Department,
     QuarterEnum,
     ReviewVerdictEnum,
 )
@@ -75,6 +82,49 @@ async def _create_event(
     db.add(event)
 
 
+async def _get_goal_context(
+    db: AsyncSession,
+    goal_id: Optional[uuid.UUID] = None,
+    employee_id: Optional[int] = None,
+    goal_obj: Optional[Goal] = None,
+) -> str:
+    # 1. Start with goal object if provided, else fetch it
+    if not goal_obj and goal_id:
+        goal_obj = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
+
+    # 2. Extract context from the linked project if any
+    if goal_obj:
+        if goal_obj.project_id:
+            project = await db.get(Project, goal_obj.project_id)
+            if project:
+                return f"Проект: {project.name}. Описание: {project.description or 'Нет описания'}"
+        # If no project linked directly, fall back to employee context
+        employee_id = goal_obj.employee_id
+
+    # 3. If we have an employee_id, look up all their assigned projects
+    if employee_id:
+        query = (
+            select(Project)
+            .join(EmployeeProject, Project.id == EmployeeProject.project_id)
+            .where(EmployeeProject.employee_id == employee_id)
+        )
+        result = await db.execute(query)
+        projects = result.scalars().all()
+        if projects:
+            proj_list = "\n".join([f"- {p.name}: {p.description or 'Без описания'}" for p in projects])
+            ctx = f"Проекты сотрудника (Employee ID: {employee_id}):\n{proj_list}"
+            logger.info(f"Retrieved employee projects context: {ctx[:200]}...")
+            return ctx
+
+        # 4. Fallback to department if projects are still not found
+        if goal_obj and goal_obj.department_id:
+            dept = await db.get(Department, goal_obj.department_id)
+            if dept:
+                return f"Отдел: {dept.name}"
+
+    return "Общий корпоративный контекст"
+
+
 # --- AI Endpoints ---
 @router.post("/ai/generate")
 async def generate_goals(request: GoalGenerateRequest):
@@ -88,8 +138,21 @@ async def generate_goals(request: GoalGenerateRequest):
 
 
 @router.post("/ai/evaluate")
-async def evaluate_goal_endpoint(request: GoalEvaluateRequest):
-    result = await smart_evaluator.evaluate_goal(goal_text=request.goal_text)
+async def evaluate_goal_endpoint(
+    request: GoalEvaluateRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    # Determine context: explicit, or dynamic from employee
+    context = request.context
+    if not context and request.employee_id:
+        context = await _get_goal_context(db, employee_id=request.employee_id)
+    
+    logger.info(f"Final evaluation context for goal evaluation endpoint: {context or 'default'}")
+    
+    result = await smart_evaluator.evaluate_goal(
+        goal_text=request.goal_text,
+        context=context or "Общий корпоративный контекст"
+    )
     return result
 
 
@@ -104,10 +167,12 @@ async def batch_evaluate_goals(
     if not goals:
         raise HTTPException(status_code=404, detail="No goals found for this employee")
 
-    eval_tasks = [
-        smart_evaluator.evaluate_goal(goal_text=g.goal_text)
-        for g in goals
-    ]
+    # Fetch project/department info for context
+    eval_tasks = []
+    for g in goals:
+        context = await _get_goal_context(db, goal_obj=g)
+        eval_tasks.append(smart_evaluator.evaluate_goal(goal_text=g.goal_text, context=context))
+    
     evaluations = await asyncio.gather(*eval_tasks)
 
     individual = []
@@ -153,7 +218,9 @@ async def create_evaluation(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    result = await smart_evaluator.evaluate_goal(goal_text=goal.goal_text)
+    # Fetch context (Project description or Department)
+    context = await _get_goal_context(db, goal_obj=goal)
+    result = await smart_evaluator.evaluate_goal(goal_text=goal.goal_text, context=context)
     scores_dict = result.smart_scores.model_dump() if result.smart_scores else {}
 
     evaluation = GoalEvaluation(

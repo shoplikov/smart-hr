@@ -17,11 +17,14 @@ export const api = {
         return response.json();
     },
 
-    evaluateGoal: async (goalText) => {
+    evaluateGoal: async (goalText, employeeId = null) => {
+        const payload = { goal_text: goalText };
+        if (employeeId) payload.employee_id = employeeId;
+        
         const response = await fetch(`${API_BASE}/goals/ai/evaluate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ goal_text: goalText })
+            body: JSON.stringify(payload)
         });
         if (!response.ok) throw new Error('Ошибка при оценке цели');
         return response.json();

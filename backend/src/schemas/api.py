@@ -37,6 +37,8 @@ class GoalResponse(BaseModel):
 # --- AI Request Schemas ---
 class GoalEvaluateRequest(BaseModel):
     goal_text: str = Field(..., description="Текст цели для оценки")
+    context: Optional[str] = Field(None, description="Контекст проекта/отдела для оценки релевантности")
+    employee_id: Optional[int] = Field(None, description="ID сотрудника для автоматического поиска контекста")
 
 
 class GoalGenerateRequest(BaseModel):

@@ -4,6 +4,7 @@ from openai import AsyncOpenAI
 from src.core.config import settings
 from src.core.prompt_manager import prompt_manager
 from src.models.llm_schemas import GoalEvaluationResult
+from src.services.rag_service import rag_service
 
 logger = logging.getLogger(__name__)
 
@@ -13,14 +14,18 @@ class SmartEvaluatorService:
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = "gpt-4o-mini"
 
-    async def evaluate_goal(self, goal_text: str) -> GoalEvaluationResult:
+    async def evaluate_goal(
+        self, goal_text: str, context: str = "Общий корпоративный контекст"
+    ) -> GoalEvaluationResult:
         logger.info(f"Evaluating SMART criteria for goal: {goal_text[:80]}")
+        logger.info(f"Context used for evaluation: {context[:500]}...")
 
         system_prompt = prompt_manager.get_prompt("smart_evaluator", "system")
         user_prompt = prompt_manager.get_prompt(
             "smart_evaluator",
             "user",
             goal_text=goal_text,
+            context=context,
         )
 
         response = await self.client.beta.chat.completions.parse(

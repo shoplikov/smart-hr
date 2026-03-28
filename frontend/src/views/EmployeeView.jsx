@@ -38,7 +38,7 @@ export const EmployeeView = () => {
         if (!draftGoalText) return;
         setEvaluating(true);
         try {
-            const result = await api.evaluateGoal(draftGoalText);
+            const result = await api.evaluateGoal(draftGoalText, user.employee.id);
             setEvaluation(result);
         } catch {
             // handled silently
