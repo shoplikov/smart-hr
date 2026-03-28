@@ -15,6 +15,7 @@ from sqlalchemy import (
     func,
 )
 from sqlalchemy.dialects.postgresql import ARRAY, ENUM, JSONB, UUID
+from sqlalchemy.orm import relationship
 from src.models.base import Base
 
 
@@ -70,12 +71,40 @@ class ReviewVerdictEnum(str, enum.Enum):
 
 
 class ProjectStatusEnum(str, enum.Enum):
+    idea = "idea"
+    planning = "planning"
     active = "active"
+    on_hold = "on_hold"
     done = "done"
+    cancelled = "cancelled"
+
+
+class ProjectRoleEnum(str, enum.Enum):
+    pm = "pm"
+    ba = "ba"
+    dev_backend = "dev_backend"
+    dev_frontend = "dev_frontend"
+    devops = "devops"
+    qa = "qa"
+    analyst = "analyst"
+    ml = "ml"
+    architect = "architect"
+    security = "security"
+    support = "support"
+    other = "other"
 
 
 class SystemTypeEnum(str, enum.Enum):
+    crm = "crm"
+    erp = "erp"
     hr = "hr"
+    dwh = "dwh"
+    bi = "bi"
+    integration = "integration"
+    ml = "ml"
+    portal = "portal"
+    mobile = "mobile"
+    monitoring = "monitoring"
     other = "other"
 
 
@@ -87,9 +116,10 @@ class Department(Base):
     code = Column(Text, unique=True)
     parent_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"))
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    parent = relationship("Department", remote_side=[id])
 
 
 class Position(Base):
@@ -97,6 +127,8 @@ class Position(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(Text, nullable=False)
     grade = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class Employee(Base):
@@ -114,6 +146,62 @@ class Employee(Base):
     manager_id = Column(Integer, ForeignKey("employees.id", ondelete="SET NULL"))
     hire_date = Column(Date)
     is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    department = relationship("Department")
+    position = relationship("Position")
+    manager = relationship("Employee", remote_side=[id])
+
+
+class System(Base):
+    __tablename__ = "systems"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(Text, nullable=False, unique=True)
+    system_type = Column(ENUM(SystemTypeEnum, name="system_type_enum", create_type=False), nullable=False)
+    owner_department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"))
+    description = Column(Text)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    owner_department = relationship("Department")
+
+
+class Project(Base):
+    __tablename__ = "projects"
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code = Column(Text, unique=True)
+    name = Column(Text, nullable=False)
+    description = Column(Text)
+    owner_department_id = Column(Integer, ForeignKey("departments.id", ondelete="SET NULL"))
+    status = Column(ENUM(ProjectStatusEnum, name="project_status_enum", create_type=False), default=ProjectStatusEnum.active, nullable=False)
+    start_date = Column(Date)
+    end_date = Column(Date)
+    budget_kzt = Column(Numeric(18, 2))
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    owner_department = relationship("Department")
+
+
+class ProjectSystem(Base):
+    __tablename__ = "project_systems"
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
+    system_id = Column(Integer, ForeignKey("systems.id", ondelete="RESTRICT"), primary_key=True)
+
+
+class EmployeeProject(Base):
+    __tablename__ = "employee_projects"
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"), primary_key=True)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), primary_key=True)
+    role = Column(ENUM(ProjectRoleEnum, name="project_role_enum", create_type=False), primary_key=True, default=ProjectRoleEnum.other)
+    allocation_percent = Column(SmallInteger)
+    start_date = Column(Date)
+    end_date = Column(Date)
+
+    employee = relationship("Employee")
+    project = relationship("Project")
 
 
 class Document(Base):
@@ -131,15 +219,8 @@ class Document(Base):
     keywords = Column(ARRAY(Text))
     version = Column(Text)
     is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class Goal(Base):
@@ -154,8 +235,8 @@ class Goal(Base):
     employee_name_snapshot = Column(Text)
     position_snapshot = Column(Text)
     department_name_snapshot = Column(Text)
-    project_id = Column(UUID(as_uuid=True))
-    system_id = Column(Integer)
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="SET NULL"))
+    system_id = Column(Integer, ForeignKey("systems.id", ondelete="SET NULL"))
     goal_text = Column(Text, nullable=False)
     year = Column(SmallInteger, nullable=False)
     quarter = Column(
@@ -171,15 +252,13 @@ class Goal(Base):
     )
     external_ref = Column(Text)
     priority = Column(SmallInteger)
-    created_at = Column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
-    )
-    updated_at = Column(
-        DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
-        nullable=False,
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    employee = relationship("Employee")
+    department = relationship("Department")
+    project = relationship("Project")
+    system = relationship("System")
 
 
 class GoalEvaluation(Base):
@@ -192,7 +271,7 @@ class GoalEvaluation(Base):
     smart_scores = Column(JSONB)
     recommendations = Column(JSONB)
     improved_goal = Column(Text)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class GoalReview(Base):
@@ -208,9 +287,7 @@ class GoalReview(Base):
         nullable=False,
     )
     comment_text = Column(Text, nullable=False)
-    created_at = Column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class GoalEvent(Base):
@@ -229,9 +306,7 @@ class GoalEvent(Base):
     old_text = Column(Text)
     new_text = Column(Text)
     event_metadata = Column("metadata", JSONB)
-    created_at = Column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
-    )
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class KpiCatalog(Base):
@@ -239,6 +314,10 @@ class KpiCatalog(Base):
     metric_key = Column(Text, primary_key=True)
     title = Column(Text, nullable=False)
     unit = Column(Text, nullable=False)
+    description = Column(Text)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class KpiTimeseries(Base):
@@ -246,8 +325,13 @@ class KpiTimeseries(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     scope_type = Column(Text, nullable=False)
     department_id = Column(Integer, ForeignKey("departments.id", ondelete="CASCADE"))
+    employee_id = Column(Integer, ForeignKey("employees.id", ondelete="CASCADE"))
+    project_id = Column(UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"))
+    system_id = Column(Integer, ForeignKey("systems.id", ondelete="CASCADE"))
     metric_key = Column(
         Text, ForeignKey("kpi_catalog.metric_key", ondelete="RESTRICT"), nullable=False
     )
     period_date = Column(Date, nullable=False)
     value_num = Column(Numeric(18, 6), nullable=False)
+    ts_metadata = Column("metadata", JSONB)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
