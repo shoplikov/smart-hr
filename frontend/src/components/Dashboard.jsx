@@ -6,16 +6,18 @@ export const Dashboard = ({ departmentId }) => {
     const [chartData, setChartData] = useState([]);
     const [kpiInfo, setKpiInfo] = useState({ name: "Загрузка...", unit: "" });
     const [loading, setLoading] = useState(true);
-    const [selectedMetric, setSelectedMetric] = useState('dev_lead_time_days');
+    const [availableMetrics, setAvailableMetrics] = useState([]);
+    const [selectedMetric, setSelectedMetric] = useState('');
 
-    const availableMetrics = [
-        { id: 'dev_lead_time_days', label: 'Время разработки (Lead Time)' },
-        { id: 'sla_compliance', label: 'Соблюдение SLA (%)' },
-        { id: 'defect_rate_percent', label: 'Процент дефектов' },
-        { id: 'change_failure_rate', label: 'Доля неудачных релизов' },
-        { id: 'data_quality_score', label: 'Индекс качества данных' },
-        { id: 'training_coverage_percent', label: 'Охват обучением (%)' }
-    ];
+    // Fetch KPI catalog on mount
+    useEffect(() => {
+        api.getKpiCatalog().then(items => {
+            setAvailableMetrics(items);
+            if (items.length > 0 && !selectedMetric) {
+                setSelectedMetric(items[0].metric_key);
+            }
+        }).catch(console.error);
+    }, []);
 
     const fetchMetrics = useCallback(async () => {
         setLoading(true);
@@ -48,8 +50,8 @@ export const Dashboard = ({ departmentId }) => {
                     className="block w-64 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm bg-gray-50"
                 >
                     {availableMetrics.map(metric => (
-                        <option key={metric.id} value={metric.id}>
-                            {metric.label}
+                        <option key={metric.metric_key} value={metric.metric_key}>
+                            {metric.title} ({metric.unit})
                         </option>
                     ))}
                 </select>

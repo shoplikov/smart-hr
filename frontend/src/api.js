@@ -62,6 +62,12 @@ export const api = {
         return response.json();
     },
 
+    getKpiCatalog: async () => {
+        const response = await fetch(`${API_BASE}/analytics/kpi-catalog`);
+        if (!response.ok) throw new Error('Ошибка при загрузке каталога KPI');
+        return response.json();
+    },
+
     updateGoalStatus: async (goalId, status) => {
         const response = await fetch(`${API_BASE}/goals/${goalId}/status`, {
             method: 'PATCH',

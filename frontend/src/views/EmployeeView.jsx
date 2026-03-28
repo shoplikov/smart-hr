@@ -8,11 +8,18 @@ export const EmployeeView = () => {
     const user = useUser();
     const [draftGoalText, setDraftGoalText] = useState('');
     const [draftMetric, setDraftMetric] = useState('');
+    const [draftDeadline, setDraftDeadline] = useState('');
+    const [kpiCatalog, setKpiCatalog] = useState([]);
     const [evaluation, setEvaluation] = useState(null);
     const [evaluating, setEvaluating] = useState(false);
     const [saving, setSaving] = useState(false);
     const [editingGoalId, setEditingGoalId] = useState(null);
     const [saveSuccess, setSaveSuccess] = useState(false);
+
+    // Fetch KPI catalog on mount
+    useEffect(() => {
+        api.getKpiCatalog().then(setKpiCatalog).catch(console.error);
+    }, []);
 
     // Listen for editGoal events from MyGoalsView
     useEffect(() => {
@@ -22,6 +29,7 @@ export const EmployeeView = () => {
                 setEditingGoalId(goal.id);
                 setDraftGoalText(goal.goal_text);
                 setDraftMetric(goal.metric || '');
+                setDraftDeadline(goal.deadline || '');
                 setEvaluation(null);
                 window.scrollTo({ top: 0, behavior: 'smooth' });
             }
@@ -49,11 +57,16 @@ export const EmployeeView = () => {
         setSaveSuccess(false);
         try {
             if (editingGoalId) {
-                await api.updateGoal(editingGoalId, { goal_text: draftGoalText, metric: draftMetric || null });
+                await api.updateGoal(editingGoalId, {
+                    goal_text: draftGoalText,
+                    metric: draftMetric || null,
+                    deadline: draftDeadline || null,
+                });
             } else {
                 await api.createGoal({
                     goal_text: draftGoalText,
                     metric: draftMetric || null,
+                    deadline: draftDeadline || null,
                     quarter: user.quarter,
                     year: user.year,
                     employee_id: user.employee.id,
@@ -74,6 +87,7 @@ export const EmployeeView = () => {
         setEditingGoalId(null);
         setDraftGoalText('');
         setDraftMetric('');
+        setDraftDeadline('');
         setEvaluation(null);
     };
 
@@ -164,12 +178,28 @@ export const EmployeeView = () => {
                                 <label className="block text-xs font-medium text-gray-500 mb-1.5">
                                     KPI-метрика <span className="text-gray-400 font-normal">(необязательно)</span>
                                 </label>
-                                <input
-                                    type="text"
-                                    placeholder="sla_compliance, cost_saving_kzt"
-                                    className="block w-full border border-gray-200 rounded-lg shadow-sm px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50 placeholder:text-gray-400"
+                                <select
+                                    className="block w-full border border-gray-200 rounded-lg shadow-sm px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50"
                                     value={draftMetric}
                                     onChange={e => setDraftMetric(e.target.value)}
+                                >
+                                    <option value="">— Не выбрано —</option>
+                                    {kpiCatalog.map(kpi => (
+                                        <option key={kpi.metric_key} value={kpi.metric_key}>
+                                            {kpi.title} ({kpi.unit})
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">
+                                    Дедлайн <span className="text-gray-400 font-normal">(необязательно)</span>
+                                </label>
+                                <input
+                                    type="date"
+                                    className="block w-full border border-gray-200 rounded-lg shadow-sm px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50"
+                                    value={draftDeadline}
+                                    onChange={e => setDraftDeadline(e.target.value)}
                                 />
                             </div>
                         </div>

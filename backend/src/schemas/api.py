@@ -7,7 +7,8 @@ from pydantic import BaseModel, Field
 # --- Goal Schemas ---
 class GoalCreate(BaseModel):
     goal_text: str = Field(..., description="Текст цели")
-    metric: Optional[str] = Field(None, description="KPI-метрика (необязательно)")
+    metric: Optional[str] = Field(None, description="Ключ KPI-метрики из kpi_catalog (необязательно)")
+    deadline: Optional[str] = Field(None, description="Дедлайн цели в формате YYYY-MM-DD (необязательно)")
     quarter: int = Field(..., ge=1, le=4, description="Квартал (1-4)")
     year: int = Field(..., ge=2020, description="Год")
     employee_id: int = Field(..., description="ID сотрудника")
@@ -16,7 +17,8 @@ class GoalCreate(BaseModel):
 
 class GoalUpdate(BaseModel):
     goal_text: str = Field(..., description="Текст цели")
-    metric: Optional[str] = Field(None, description="KPI-метрика (необязательно)")
+    metric: Optional[str] = Field(None, description="Ключ KPI-метрики из kpi_catalog (необязательно)")
+    deadline: Optional[str] = Field(None, description="Дедлайн цели в формате YYYY-MM-DD (необязательно)")
 
 
 class GoalStatusUpdate(BaseModel):
@@ -27,6 +29,8 @@ class GoalResponse(BaseModel):
     id: str
     goal_text: str
     metric: Optional[str] = None
+    metric_title: Optional[str] = None
+    deadline: Optional[str] = None
     quarter: int
     year: int
     employee_id: int

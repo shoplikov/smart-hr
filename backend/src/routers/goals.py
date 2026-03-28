@@ -18,6 +18,7 @@ from src.models.schema import (
     GoalEventTypeEnum,
     GoalReview,
     GoalStatusEnum,
+    KpiCatalog,
     Project,
     EmployeeProject,
     Department,
@@ -47,12 +48,14 @@ VERDICT_TO_STATUS = {
 }
 
 
-def _goal_to_dict(g: Goal) -> dict:
+def _goal_to_dict(g: Goal, kpi_title: Optional[str] = None) -> dict:
     q_int = int(g.quarter.value[-1]) if g.quarter else 1
     return {
         "id": str(g.goal_id),
         "goal_text": g.goal_text,
         "metric": g.metric,
+        "metric_title": kpi_title,
+        "deadline": g.deadline.isoformat() if g.deadline else None,
         "quarter": q_int,
         "year": g.year,
         "employee_id": g.employee_id,
@@ -60,6 +63,24 @@ def _goal_to_dict(g: Goal) -> dict:
         "created_at": g.created_at.isoformat() if g.created_at else None,
         "updated_at": g.updated_at.isoformat() if g.updated_at else None,
     }
+
+
+async def _validate_metric(db: AsyncSession, metric_key: Optional[str]) -> Optional[str]:
+    """Validate metric against kpi_catalog. Returns the title if valid, raises 400 if invalid."""
+    if not metric_key:
+        return None
+    kpi = await db.get(KpiCatalog, metric_key)
+    if not kpi:
+        raise HTTPException(
+            status_code=400,
+            detail=f"KPI-метрика '{metric_key}' не найдена в kpi_catalog"
+        )
+    if not kpi.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail=f"KPI-метрика '{metric_key}' неактивна"
+        )
+    return kpi.title
 
 
 async def _create_event(
@@ -90,16 +111,25 @@ async def _get_goal_context(
     employee_id: Optional[int] = None,
     goal_obj: Optional[Goal] = None,
 ) -> str:
+    parts = []
+
     # 1. Start with goal object if provided, else fetch it
     if not goal_obj and goal_id:
         goal_obj = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
+
+    # 1b. If goal has a KPI metric, include it in context
+    if goal_obj and goal_obj.metric:
+        kpi = await db.get(KpiCatalog, goal_obj.metric)
+        if kpi:
+            parts.append(f"KPI-метрика цели: {kpi.title} ({kpi.metric_key}, единица: {kpi.unit}). {kpi.description or ''}")
 
     # 2. Extract context from the linked project if any
     if goal_obj:
         if goal_obj.project_id:
             project = await db.get(Project, goal_obj.project_id)
             if project:
-                return f"Проект: {project.name}. Описание: {project.description or 'Нет описания'}"
+                parts.append(f"Проект: {project.name}. Описание: {project.description or 'Нет описания'}")
+                return "\n".join(parts) if parts else "Общий корпоративный контекст"
         # If no project linked directly, fall back to employee context
         employee_id = goal_obj.employee_id
 
@@ -114,7 +144,8 @@ async def _get_goal_context(
         projects = result.scalars().all()
         if projects:
             proj_list = "\n".join([f"- {p.name}: {p.description or 'Без описания'}" for p in projects])
-            ctx = f"Проекты сотрудника (Employee ID: {employee_id}):\n{proj_list}"
+            parts.append(f"Проекты сотрудника (Employee ID: {employee_id}):\n{proj_list}")
+            ctx = "\n".join(parts)
             logger.info(f"Retrieved employee projects context: {ctx[:200]}...")
             return ctx
 
@@ -122,9 +153,10 @@ async def _get_goal_context(
         if goal_obj and goal_obj.department_id:
             dept = await db.get(Department, goal_obj.department_id)
             if dept:
-                return f"Отдел: {dept.name}"
+                parts.append(f"Отдел: {dept.name}")
+                return "\n".join(parts) if parts else "Общий корпоративный контекст"
 
-    return "Общий корпоративный контекст"
+    return "\n".join(parts) if parts else "Общий корпоративный контекст"
 
 
 # --- AI Endpoints ---
@@ -373,13 +405,23 @@ async def get_events(goal_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
 # --- CRUD Endpoints ---
 @router.post("/", response_model=GoalResponse)
 async def create_goal(goal: GoalCreate, db: AsyncSession = Depends(get_db)):
+    kpi_title = await _validate_metric(db, goal.metric)
     q_enum = getattr(QuarterEnum, f"Q{goal.quarter}", QuarterEnum.Q1)
+
+    from datetime import date as date_type
+    deadline_val = None
+    if goal.deadline:
+        try:
+            deadline_val = date_type.fromisoformat(goal.deadline)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат дедлайна. Используйте YYYY-MM-DD")
 
     new_goal = Goal(
         employee_id=goal.employee_id,
         department_id=goal.department_id,
         goal_text=goal.goal_text,
         metric=goal.metric,
+        deadline=deadline_val,
         quarter=q_enum,
         year=goal.year,
         status=GoalStatusEnum.draft,
@@ -396,7 +438,7 @@ async def create_goal(goal: GoalCreate, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
     await db.refresh(new_goal)
-    return _goal_to_dict(new_goal)
+    return _goal_to_dict(new_goal, kpi_title=kpi_title)
 
 
 @router.get("/employee/{employee_id}", response_model=List[GoalResponse])
@@ -408,7 +450,18 @@ async def get_employee_goals(employee_id: int, db: AsyncSession = Depends(get_db
     )
     result = await db.execute(query)
     goals = result.scalars().all()
-    return [_goal_to_dict(g) for g in goals]
+
+    # Batch-fetch KPI titles for all goals that have a metric
+    metric_keys = {g.metric for g in goals if g.metric}
+    kpi_titles = {}
+    if metric_keys:
+        kpi_result = await db.execute(
+            select(KpiCatalog).where(KpiCatalog.metric_key.in_(metric_keys))
+        )
+        for kpi in kpi_result.scalars().all():
+            kpi_titles[kpi.metric_key] = kpi.title
+
+    return [_goal_to_dict(g, kpi_title=kpi_titles.get(g.metric)) for g in goals]
 
 
 @router.patch("/{goal_id}/status", response_model=GoalResponse)
@@ -441,6 +494,8 @@ async def update_goal_status(
 async def update_goal(
     goal_id: uuid.UUID, goal_update: GoalUpdate, db: AsyncSession = Depends(get_db)
 ):
+    kpi_title = await _validate_metric(db, goal_update.metric)
+
     goal = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
 
     if not goal:
@@ -448,9 +503,18 @@ async def update_goal(
     if goal.status in LOCKED_STATUSES:
         raise HTTPException(status_code=400, detail="Cannot edit a goal with this status.")
 
+    from datetime import date as date_type
+    deadline_val = None
+    if goal_update.deadline:
+        try:
+            deadline_val = date_type.fromisoformat(goal_update.deadline)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Неверный формат дедлайна. Используйте YYYY-MM-DD")
+
     old_text = goal.goal_text
     goal.goal_text = goal_update.goal_text
     goal.metric = goal_update.metric
+    goal.deadline = deadline_val
 
     await _create_event(
         db, goal_id, GoalEventTypeEnum.edited,
@@ -461,7 +525,7 @@ async def update_goal(
 
     await db.commit()
     await db.refresh(goal)
-    return _goal_to_dict(goal)
+    return _goal_to_dict(goal, kpi_title=kpi_title)
 
 
 @router.delete("/{goal_id}", status_code=204)

@@ -9,6 +9,23 @@ from src.schemas.api import ChartDataPoint, DashboardResponse
 router = APIRouter(prefix="/api/v1/analytics", tags=["Analytics"])
 
 
+@router.get("/kpi-catalog")
+async def get_kpi_catalog(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(KpiCatalog).where(KpiCatalog.is_active == True).order_by(KpiCatalog.title)
+    )
+    items = result.scalars().all()
+    return [
+        {
+            "metric_key": item.metric_key,
+            "title": item.title,
+            "unit": item.unit,
+            "description": item.description,
+        }
+        for item in items
+    ]
+
+
 @router.get("/kpi/{department_id}", response_model=DashboardResponse)
 async def get_department_kpi(
     department_id: int,
