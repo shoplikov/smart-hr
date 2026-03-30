@@ -235,6 +235,7 @@ export const GoalCard = ({
                         {mode === 'manager' && !isLocked && (
                             <button
                                 onClick={() => { onReview?.(goal.id); refreshReviews(); }}
+                                data-tour="manager-review-goal"
                                 className="text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-xl transition shadow-sm shadow-amber-600/20 focus:outline-none focus:ring-4 focus:ring-amber-200"
                             >
                                 Ревью

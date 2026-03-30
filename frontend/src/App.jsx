@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import EmployeeView from './views/EmployeeView';
 import ManagerView from './views/ManagerView';
 import MyGoalsView from './views/MyGoalsView';
 import { UserProvider, useUser } from './UserContext';
 import { UserPicker } from './components/UserPicker';
 import { ToastProvider } from './components/shared';
+import { OnboardingTour } from './components/OnboardingTour';
 
 const NAV_ITEMS = [
   { key: 'workspace', label: 'Кабинет', icon: (
@@ -23,7 +24,90 @@ function AppShell() {
   const { employee, role, logout } = useUser();
   const [activeTab, setActiveTab] = useState('workspace');
 
-  if (!employee) return <UserPicker />;
+  const isManager = role === 'manager';
+  const [tourOpen, setTourOpen] = useState(false);
+  const [tourSteps, setTourSteps] = useState([]);
+  const [tourStepIndex, setTourStepIndex] = useState(0);
+
+  const employeeTourSteps = useMemo(
+    () => [
+      {
+        targetSelector: '#tour-employee-goal-text',
+        title: 'Сформулируйте цель',
+        description: 'В поле «Текст цели» опишите, какой результат вы хотите получить по SMART.',
+        ensureTab: 'workspace',
+      },
+      {
+        targetSelector: '#tour-employee-evaluate-smart',
+        title: 'Запустите SMART-анализ',
+        description: 'Нажмите «Оценить по SMART», чтобы получить индекс и рекомендации.',
+        ensureTab: 'workspace',
+      },
+      {
+        targetSelector: '#tour-employee-save-goal',
+        title: 'Сохраните цель',
+        description: 'После анализа нажмите «Отправить/Сохранить», чтобы цель появилась в списке.',
+        ensureTab: 'workspace',
+      },
+      {
+        targetSelector: '#tour-tab-goals',
+        title: 'Перейдите в «Мои цели»',
+        description: 'На вкладке вы увидите цели и их статусы.',
+        ensureTab: 'goals',
+      },
+      {
+        targetSelector: '#tour-employee-goals-sorting',
+        title: 'Фильтры и сортировка',
+        description: 'Используйте фильтрацию и сортировку, чтобы быстро находить нужные цели.',
+        ensureTab: 'goals',
+      },
+    ],
+    []
+  );
+
+  const managerTourSteps = useMemo(
+    () => [
+      {
+        targetSelector: '#tour-manager-employee-search',
+        title: 'Выберите сотрудника',
+        description: 'В сайдбаре используйте поиск, чтобы быстро найти нужного подчиненного.',
+      },
+      {
+        targetSelector: '#tour-manager-dashboard-metric-select',
+        title: 'Аналитика отдела',
+        description: 'Выберите KPI-метрику в выпадающем списке аналитики.',
+      },
+      {
+        targetSelector: '#tour-manager-batch-evaluate',
+        title: 'Общая оценка по SMART',
+        description: 'Нажмите кнопку, чтобы запустить анализ целей команды и увидеть рекомендации.',
+      },
+      {
+        targetSelector: '[data-tour="manager-review-goal"]',
+        title: 'Оставьте ревью',
+        description: 'Откройте «Ревью» у цели и добавьте комментарий руководителя.',
+      },
+    ],
+    []
+  );
+
+  const closeTour = () => {
+    setTourOpen(false);
+    setTourSteps([]);
+    setTourStepIndex(0);
+  };
+
+  const startTour = () => {
+    const stepsToUse = isManager ? managerTourSteps : employeeTourSteps;
+    if (!stepsToUse || stepsToUse.length === 0) return;
+
+    setTourSteps(stepsToUse);
+    setTourStepIndex(0);
+    setTourOpen(true);
+
+    const initialTab = stepsToUse[0]?.ensureTab;
+    if (initialTab && initialTab !== activeTab) setActiveTab(initialTab);
+  };
 
   const handleEditGoalFromGoalsPage = (goal) => {
     setActiveTab('workspace');
@@ -32,6 +116,8 @@ function AppShell() {
       window.dispatchEvent(new CustomEvent('editGoal', { detail: goal }));
     }, 100);
   };
+
+  if (!employee) return <UserPicker />;
 
   return (
     <div className="min-h-screen bg-gray-50 font-sans">
@@ -49,6 +135,7 @@ function AppShell() {
                   {NAV_ITEMS.map(item => (
                     <button
                       key={item.key}
+                      id={item.key === 'workspace' ? 'tour-tab-workspace' : item.key === 'goals' ? 'tour-tab-goals' : undefined}
                       onClick={() => setActiveTab(item.key)}
                       className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                         activeTab === item.key
@@ -69,6 +156,13 @@ function AppShell() {
                 <div className="text-xs text-gray-400">{employee.position_name}</div>
               </div>
               <button
+                id="tour-run-button"
+                onClick={startTour}
+                className="text-xs font-medium text-white bg-indigo-700 hover:bg-indigo-800 px-3 py-1.5 rounded-lg transition shadow-sm shadow-indigo-600/20 focus:outline-none focus:ring-4 focus:ring-indigo-200"
+              >
+                Пройти тур
+              </button>
+              <button
                 onClick={logout}
                 className="text-xs font-medium text-gray-500 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 px-3 py-1.5 rounded-lg transition"
               >
@@ -88,6 +182,26 @@ function AppShell() {
           <EmployeeView />
         )}
       </main>
+
+      <OnboardingTour
+        open={tourOpen}
+        steps={tourSteps}
+        stepIndex={tourStepIndex}
+        onNext={() => {
+          const nextIndex = Math.min(tourStepIndex + 1, tourSteps.length - 1);
+          const ensureTab = tourSteps[nextIndex]?.ensureTab;
+          if (ensureTab && ensureTab !== activeTab) setActiveTab(ensureTab);
+          setTourStepIndex(nextIndex);
+        }}
+        onPrev={() => {
+          const prevIndex = Math.max(tourStepIndex - 1, 0);
+          const ensureTab = tourSteps[prevIndex]?.ensureTab;
+          if (ensureTab && ensureTab !== activeTab) setActiveTab(ensureTab);
+          setTourStepIndex(prevIndex);
+        }}
+        onClose={closeTour}
+        activeTab={activeTab}
+      />
     </div>
   );
 }

@@ -44,6 +44,7 @@ export const Dashboard = ({ departmentId }) => {
                 <select 
                     value={selectedMetric}
                     onChange={(e) => setSelectedMetric(e.target.value)}
+                    id="tour-manager-dashboard-metric-select"
                     className="block w-64 pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md shadow-sm bg-gray-50"
                 >
                     {availableMetrics.map(metric => (

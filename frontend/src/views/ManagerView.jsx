@@ -162,6 +162,7 @@ const EmployeeSidebar = ({ employees, selectedId, onSelect, loading, search, onS
                 <input
                     type="text"
                     placeholder="Поиск сотрудника..."
+                    id="tour-manager-employee-search"
                     value={search}
                     onChange={(e) => onSearchChange(e.target.value)}
                     className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
@@ -390,6 +391,7 @@ export const ManagerView = () => {
                                 </h3>
                                 <button
                                     onClick={handleBatchEvaluate}
+                                    id="tour-manager-batch-evaluate"
                                     disabled={batchLoading || teamGoals.length === 0}
                                     className="text-sm font-semibold text-white bg-indigo-700 hover:bg-indigo-800 py-3 px-6 rounded-xl transition disabled:opacity-50 shadow-md shadow-indigo-600/20 focus:outline-none focus:ring-4 focus:ring-indigo-200"
                                 >

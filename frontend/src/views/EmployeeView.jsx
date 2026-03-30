@@ -157,6 +157,7 @@ export const EmployeeView = () => {
                                 </label>
                                 <textarea
                                     rows={4}
+                                    id="tour-employee-goal-text"
                                     placeholder="Снизить среднее время обработки заявок отдела с 48 до 36 часов к 31 марта 2026 года за счёт автоматизации процесса первичной классификации..."
                                     className="block w-full border border-gray-200 rounded-lg shadow-sm p-3 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none bg-gray-50 placeholder:text-gray-400"
                                     value={draftGoalText}
@@ -205,6 +206,7 @@ export const EmployeeView = () => {
                             <button
                                 onClick={handleEvaluate}
                                 disabled={evaluating || saving || !draftGoalText}
+                                id="tour-employee-evaluate-smart"
                                 className="flex-1 bg-white text-indigo-700 border border-indigo-200 py-2.5 px-4 rounded-lg hover:bg-indigo-50 disabled:opacity-50 transition font-medium text-sm shadow-sm flex items-center justify-center gap-2"
                             >
                                 {evaluating ? (
@@ -227,6 +229,7 @@ export const EmployeeView = () => {
                             <button
                                 onClick={handleSaveGoal}
                                 disabled={evaluating || saving || !draftGoalText}
+                                id="tour-employee-save-goal"
                                 className="flex-1 bg-indigo-600 text-white py-2.5 px-4 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition font-medium text-sm shadow-sm flex items-center justify-center gap-2"
                             >
                                 {saving ? (

@@ -173,7 +173,7 @@ export const MyGoalsView = ({ onEditGoal }) => {
             </div>
 
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6" id="tour-employee-goals-stats">
                 <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                     <div className="text-2xl font-extrabold text-gray-900">{statsData.total}</div>
                     <div className="text-xs text-gray-500 font-medium mt-0.5">Всего целей</div>
@@ -200,7 +200,7 @@ export const MyGoalsView = ({ onEditGoal }) => {
             )}
 
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4" id="tour-employee-goals-sorting">
                 <SortToggle sortBy={sortBy} onToggle={setSortBy} />
                 {uniqueStatuses.length > 1 && (
                     <StatusFilter
