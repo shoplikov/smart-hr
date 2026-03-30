@@ -157,7 +157,8 @@ export const GoalCard = ({
         try {
             const result = await api.runAndSaveEvaluation(goal.id);
             setEvaluation(result);
-        } catch {
+        } catch (err) {
+            console.error(err);
         } finally {
             setEvalLoading(false);
         }
@@ -234,7 +235,7 @@ export const GoalCard = ({
                         {mode === 'manager' && !isLocked && (
                             <button
                                 onClick={() => { onReview?.(goal.id); refreshReviews(); }}
-                                className="text-xs font-medium text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-3 py-1.5 rounded-lg transition"
+                                className="text-sm font-semibold text-white bg-amber-600 hover:bg-amber-700 px-4 py-2 rounded-xl transition shadow-sm shadow-amber-600/20 focus:outline-none focus:ring-4 focus:ring-amber-200"
                             >
                                 Ревью
                             </button>

@@ -336,7 +336,8 @@ export const ManagerView = () => {
             const result = await api.batchEvaluateGoals(selectedSubId);
             setBatchResult(result);
             setEvalGenerations(prev => prev + 1); // trigger GoalCards remount
-        } catch {
+        } catch (err) {
+            console.error(err);
         } finally {
             setBatchLoading(false);
         }
@@ -352,7 +353,8 @@ export const ManagerView = () => {
             });
             setReviewingGoalId(null);
             await fetchTeamGoals(selectedSubId);
-        } catch {
+        } catch (err) {
+            console.error(err);
         } finally {
             setReviewSubmitting(false);
         }
@@ -389,9 +391,9 @@ export const ManagerView = () => {
                                 <button
                                     onClick={handleBatchEvaluate}
                                     disabled={batchLoading || teamGoals.length === 0}
-                                    className="text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 py-2 px-4 rounded-lg transition disabled:opacity-50 shadow-sm"
+                                    className="text-sm font-semibold text-white bg-indigo-700 hover:bg-indigo-800 py-3 px-6 rounded-xl transition disabled:opacity-50 shadow-md shadow-indigo-600/20 focus:outline-none focus:ring-4 focus:ring-indigo-200"
                                 >
-                                    {batchLoading ? 'Оценка...' : 'Пакетная SMART-оценка'}
+                                    {batchLoading ? 'Оценка...' : 'Общая оценка по SMART'}
                                 </button>
                             </div>
 
