@@ -4,20 +4,20 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    UV_SYSTEM_PYTHON=1
+    UV_SYSTEM_PYTHON=1 \
+    UV_CACHE_DIR=/root/.cache/uv
 
 RUN pip install --no-cache-dir uv
 
 COPY pyproject.toml ./
 
-RUN uv pip install -r pyproject.toml
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install -r pyproject.toml
 
 COPY src/ ./src/
 COPY prompts.yaml ./
-COPY src/ ./src/
 COPY alembic/ ./alembic/
 COPY alembic.ini ./
-COPY prompts.yaml ./
 
 EXPOSE 8000
 
