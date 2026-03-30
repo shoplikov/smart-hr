@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import settings
+from src.core.prompt_manager import prompt_manager
 from src.models.schema import Document
 
 logger = logging.getLogger(__name__)
@@ -93,7 +94,27 @@ class RAGService:
     ) -> str:
         """Returns formatted context chunks with document titles for RAG citation."""
         logger.debug("RAG search: query='%s' top_k=%d department_scope=%s", query[:100], top_k, department_scope)
-        query_embedding = await self._generate_embeddings([query])
+        
+        # Step 1: Reformulate query into a hypothetical document (HyDE)
+        system_prompt = prompt_manager.get_prompt("rag_service", "system")
+        user_prompt = prompt_manager.get_prompt("rag_service", "user", query=query)
+        
+        logger.debug("Generating reformulated query for better semantic matching")
+        response = await self.openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0.3,
+        )
+        reformulated_query = response.choices[0].message.content
+        logger.debug("Reformulated query:\n%s", reformulated_query)
+        
+        # We combine the original and reformulated queries to preserve original keywords
+        combined_query = f"{query}\n\n{reformulated_query}"
+        
+        query_embedding = await self._generate_embeddings([combined_query])
 
         results = await asyncio.to_thread(
             self.collection.query,
