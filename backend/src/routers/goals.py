@@ -261,6 +261,17 @@ async def batch_evaluate_goals(
         ev_dict["goal_id"] = str(g.goal_id)
         ev_dict["goal_text"] = g.goal_text
         individual.append(ev_dict)
+
+        scores_dict = ev.smart_scores.model_dump() if ev.smart_scores else {}
+        db_eval = GoalEvaluation(
+            goal_id=g.goal_id,
+            smart_index=ev.smart_index,
+            smart_scores=scores_dict,
+            recommendations=ev.recommendations,
+            improved_goal=ev.improved_goal,
+        )
+        db.add(db_eval)
+
         total_index += ev.smart_index
         criteria_sums["S"] += ev.smart_scores.specific
         criteria_sums["M"] += ev.smart_scores.measurable
@@ -268,13 +279,15 @@ async def batch_evaluate_goals(
         criteria_sums["R"] += ev.smart_scores.relevant
         criteria_sums["T"] += ev.smart_scores.time_bound
 
+    await db.commit()
+
     n = len(goals)
     avg_index = round(total_index / n, 2) if n else 0.0
     criteria_avg = {k: round(v / n, 2) for k, v in criteria_sums.items()} if n else {}
     weakest = sorted(criteria_avg.items(), key=lambda x: x[1])
 
     logger.info(
-        "Batch evaluation completed: employee_id=%s goals=%d avg_smart_index=%.2f",
+        "Batch evaluation completed and persisted: employee_id=%s goals=%d avg_smart_index=%.2f",
         employee_id, n, avg_index,
     )
 

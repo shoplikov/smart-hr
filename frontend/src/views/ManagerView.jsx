@@ -18,6 +18,36 @@ const GoalCountAlert = ({ count }) => {
     );
 };
 
+const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-slate-900 border border-slate-700 text-white p-3 rounded-lg shadow-xl max-w-xs z-50">
+                <p className="font-semibold text-sm mb-1">{payload[0].payload.fullText || label}</p>
+                <div className="flex justify-between items-center text-indigo-300 text-xs mt-2 pt-2 border-t border-slate-700">
+                    <span>SMART-индекс:</span>
+                    <span className="font-bold text-sm text-white">{payload[0].value.toFixed(2)}</span>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
+const RadarTooltip = ({ active, payload }) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-slate-900 border border-slate-700 text-white p-3 rounded-lg shadow-xl z-50">
+                <p className="font-semibold text-sm text-indigo-300 mb-1">{payload[0].payload.criterion}</p>
+                <div className="flex gap-4 text-xs mt-1">
+                    <span>Средний балл:</span>
+                    <span className="font-bold text-white">{payload[0].value}%</span>
+                </div>
+            </div>
+        );
+    }
+    return null;
+};
+
 const BatchSummary = ({ data }) => {
     if (!data) return null;
 
@@ -26,31 +56,44 @@ const BatchSummary = ({ data }) => {
         value: Math.round((data.criteria_averages?.[key] ?? 0) * 100),
     }));
 
-    const barData = data.evaluations.map(ev => ({
-        name: (ev.goal_text || '').length > 25 ? ev.goal_text.slice(0, 25) + '...' : ev.goal_text,
+    const barData = data.evaluations.map((ev, i) => ({
+        name: `Цель ${i + 1}`,
+        fullText: ev.goal_text,
         score: ev.smart_index,
     }));
 
     const avgIndex = data.average_smart_index ?? 0;
-    const scoreColorClass = avgIndex >= 0.7 ? 'text-green-600' : avgIndex >= 0.4 ? 'text-yellow-600' : 'text-red-600';
+    const scoreColorClass = avgIndex >= 0.7 ? 'text-emerald-500' : avgIndex >= 0.4 ? 'text-amber-500' : 'text-rose-500';
+    const bgGradient = avgIndex >= 0.7 ? 'from-emerald-500/10 to-transparent' : avgIndex >= 0.4 ? 'from-amber-500/10 to-transparent' : 'from-rose-500/10 to-transparent';
 
     return (
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-                <h2 className="text-lg font-bold text-gray-900">Качество целей сотрудника</h2>
-                <div className="text-right">
-                    <span className={`text-3xl font-extrabold ${scoreColorClass}`}>{avgIndex.toFixed(2)}</span>
-                    <span className="text-gray-400 ml-1">/ 1.0</span>
-                    <p className="text-xs text-gray-400 mt-0.5">{data.total_goals} целей оценено</p>
+        <div className={`bg-gradient-to-br ${bgGradient} bg-white rounded-2xl border border-gray-100 p-8 mb-8 shadow-sm relative overflow-hidden`}>
+            <div className="absolute top-0 right-0 -mt-16 -mr-16 w-64 h-64 bg-indigo-50 rounded-full blur-3xl opacity-60 pointer-events-none"></div>
+            
+            <div className="flex flex-col md:flex-row md:items-end justify-between mb-8 relative z-10 gap-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800 tracking-tight">Качество целей команды</h2>
+                    <p className="text-sm text-slate-500 mt-1">Оценено целей: {data.total_goals}</p>
+                </div>
+                <div className="flex items-end gap-3 bg-white/60 p-4 rounded-xl shadow-sm border border-white/40 backdrop-blur-sm">
+                    <div>
+                        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Ср. Индекс</div>
+                        <div className="flex items-baseline gap-1">
+                            <span className={`text-4xl font-extrabold tracking-tighter ${scoreColorClass}`}>{avgIndex.toFixed(2)}</span>
+                            <span className="text-slate-400 font-medium">/ 1.0</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             {data.weakest_criteria?.length > 0 && (
-                <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-lg">
-                    <h4 className="text-xs font-bold text-red-800 mb-1.5">Слабые критерии (средний балл &lt; 0.7):</h4>
-                    <div className="flex flex-wrap gap-1.5">
+                <div className="mb-8 p-4 bg-rose-50/80 border border-rose-100 rounded-xl relative z-10">
+                    <div className="flex items-center gap-2 mb-2">
+                        <h4 className="text-sm font-bold text-rose-800">Зоны роста (критерии &lt; 0.7):</h4>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
                         {data.weakest_criteria.map(c => (
-                            <span key={c.criterion} className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-xs font-medium">
+                            <span key={c.criterion} className="px-3 py-1 bg-white text-rose-600 border border-rose-200 shadow-sm rounded-lg text-xs font-semibold tracking-wide">
                                 {SMART_LABELS[c.criterion]}: {c.avg_score.toFixed(2)}
                             </span>
                         ))}
@@ -58,30 +101,48 @@ const BatchSummary = ({ data }) => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">SMART-индекс по целям</h4>
-                    <div className="h-52">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 relative z-10">
+                <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+                    <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-bold text-slate-700">Индекс по всем целям</h4>
+                    </div>
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={barData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                <XAxis dataKey="name" tick={{ fontSize: 9, fill: '#9CA3AF' }} interval={0} angle={-15} textAnchor="end" height={55} />
-                                <YAxis domain={[0, 1]} tick={{ fontSize: 10, fill: '#9CA3AF' }} />
-                                <Tooltip formatter={(v) => [v.toFixed(2), 'SMART-индекс']} />
-                                <Bar dataKey="score" fill="#6366F1" radius={[4, 4, 0, 0]} />
+                            <BarChart data={barData} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                                <defs>
+                                    <linearGradient id="barColor" x1="0" y1="0" x2="1" y2="0">
+                                        <stop offset="0%" stopColor="#818CF8" />
+                                        <stop offset="100%" stopColor="#4F46E5" />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} stroke="#E2E8F0" />
+                                <XAxis type="number" domain={[0, 1]} tick={{ fontSize: 11, fill: '#64748B' }} axisLine={false} tickLine={false} />
+                                <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: '#475569', fontWeight: 500 }} axisLine={false} tickLine={false} width={60} />
+                                <Tooltip content={<CustomTooltip />} cursor={{fill: '#F8FAFC'}} />
+                                <Bar dataKey="score" fill="url(#barColor)" radius={[0, 6, 6, 0]} barSize={24} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
-                <div>
-                    <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Средний балл критериев (%)</h4>
-                    <div className="h-52">
+                
+                <div className="bg-white rounded-xl border border-slate-100 shadow-sm p-5">
+                    <div className="flex items-center justify-between mb-2">
+                        <h4 className="text-sm font-bold text-slate-700">Распределение SMART</h4>
+                    </div>
+                    <div className="h-64">
                         <ResponsiveContainer width="100%" height="100%">
-                            <RadarChart data={radarData}>
-                                <PolarGrid stroke="#E5E7EB" />
-                                <PolarAngleAxis dataKey="criterion" tick={{ fontSize: 10, fill: '#6B7280' }} />
-                                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 9 }} />
-                                <Radar dataKey="value" stroke="#6366F1" fill="#6366F1" fillOpacity={0.2} strokeWidth={2} />
+                            <RadarChart cx="50%" cy="50%" outerRadius="70%" data={radarData}>
+                                <defs>
+                                    <linearGradient id="radarColor" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="0%" stopColor="#6366F1" stopOpacity={0.8}/>
+                                        <stop offset="100%" stopColor="#A855F7" stopOpacity={0.4}/>
+                                    </linearGradient>
+                                </defs>
+                                <PolarGrid stroke="#E2E8F0" />
+                                <PolarAngleAxis dataKey="criterion" tick={{ fontSize: 11, fill: '#475569', fontWeight: 600 }} />
+                                <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10, fill: '#64748B' }} tickCount={5} axisLine={false} />
+                                <Radar name="Критерии" dataKey="value" stroke="#8B5CF6" strokeWidth={2} fill="url(#radarColor)" fillOpacity={0.5} />
+                                <Tooltip content={<RadarTooltip />} />
                             </RadarChart>
                         </ResponsiveContainer>
                     </div>
@@ -215,6 +276,7 @@ export const ManagerView = () => {
     const [batchLoading, setBatchLoading] = useState(false);
     const [reviewingGoalId, setReviewingGoalId] = useState(null);
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
+    const [evalGenerations, setEvalGenerations] = useState(0);
 
     useEffect(() => {
         const load = async () => {
@@ -273,6 +335,7 @@ export const ManagerView = () => {
         try {
             const result = await api.batchEvaluateGoals(selectedSubId);
             setBatchResult(result);
+            setEvalGenerations(prev => prev + 1); // trigger GoalCards remount
         } catch {
         } finally {
             setBatchLoading(false);
@@ -346,7 +409,7 @@ export const ManagerView = () => {
                                 <div className="space-y-4">
                                     {teamGoals.map(goal => (
                                         <GoalCard
-                                            key={goal.id}
+                                            key={`${goal.id}-${evalGenerations}`}
                                             goal={goal}
                                             mode="manager"
                                             onReview={(id) => setReviewingGoalId(reviewingGoalId === id ? null : id)}
