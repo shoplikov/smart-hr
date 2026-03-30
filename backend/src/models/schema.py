@@ -19,7 +19,7 @@ from sqlalchemy.orm import relationship
 from src.models.base import Base
 
 
-# --- ENUMS ---
+
 class DocTypeEnum(str, enum.Enum):
     vnd = "vnd"
     strategy = "strategy"
@@ -108,7 +108,7 @@ class SystemTypeEnum(str, enum.Enum):
     other = "other"
 
 
-# --- MODELS ---
+
 class Department(Base):
     __tablename__ = "departments"
     id = Column(Integer, primary_key=True, autoincrement=True)

@@ -32,17 +32,19 @@ async def lifespan(app: FastAPI):
             except Exception as e:
                 if attempt < MAX_INGESTION_RETRIES:
                     logger.warning(
-                        f"RAG ingestion attempt {attempt}/{MAX_INGESTION_RETRIES} failed: {e} "
-                        f"— retrying in {RETRY_DELAY_SECONDS}s..."
+                        "RAG ingestion attempt %d/%d failed: %s — retrying in %ds...",
+                        attempt, MAX_INGESTION_RETRIES, e, RETRY_DELAY_SECONDS,
                     )
                     await asyncio.sleep(RETRY_DELAY_SECONDS)
                 else:
                     logger.error(
-                        f"RAG ingestion failed after {MAX_INGESTION_RETRIES} attempts: {e}"
+                        "RAG ingestion failed after %d attempts: %s",
+                        MAX_INGESTION_RETRIES, e,
                     )
     else:
         logger.info(
-            f"ChromaDB already has {rag_service.collection.count()} chunks, skipping ingestion."
+            "ChromaDB already has %d chunks, skipping ingestion.",
+            rag_service.collection.count(),
         )
     yield
     get_client().flush()

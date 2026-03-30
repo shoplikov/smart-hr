@@ -21,8 +21,8 @@ class SmartEvaluatorService:
     async def evaluate_goal(
         self, goal_text: str, context: str = "Общий корпоративный контекст"
     ) -> GoalEvaluationResult:
-        logger.info(f"Evaluating SMART criteria for goal: {goal_text[:80]}")
-        logger.info(f"Context used for evaluation: {context[:500]}...")
+        logger.info("Evaluating SMART criteria for goal: '%s'", goal_text[:80])
+        logger.debug("Evaluation context (%d chars): '%s'", len(context), context[:300])
 
         system_prompt = prompt_manager.get_prompt("smart_evaluator", "system")
         user_prompt = prompt_manager.get_prompt(
@@ -32,6 +32,7 @@ class SmartEvaluatorService:
             context=context,
         )
 
+        logger.debug("Calling OpenAI %s for SMART evaluation", self.model)
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -42,9 +43,19 @@ class SmartEvaluatorService:
             temperature=0.3,
         )
 
-        return GoalEvaluationResult.model_validate_json(
+        result = GoalEvaluationResult.model_validate_json(
             response.choices[0].message.content
         )
+        logger.info(
+            "SMART evaluation completed: smart_index=%.2f scores=[S=%.1f M=%.1f A=%.1f R=%.1f T=%.1f] (tokens: prompt=%s completion=%s)",
+            result.smart_index,
+            result.smart_scores.specific, result.smart_scores.measurable,
+            result.smart_scores.achievable, result.smart_scores.relevant,
+            result.smart_scores.time_bound,
+            getattr(response.usage, 'prompt_tokens', '?'),
+            getattr(response.usage, 'completion_tokens', '?'),
+        )
+        return result
 
 
 smart_evaluator = SmartEvaluatorService()

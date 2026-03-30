@@ -147,7 +147,6 @@ export const MyGoalsView = ({ onEditGoal }) => {
             await api.deleteGoal(goalId);
             await fetchGoals();
         } catch {
-            // handled silently
         }
     };
 
@@ -167,13 +166,13 @@ export const MyGoalsView = ({ onEditGoal }) => {
 
     return (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-            {/* Header */}
+
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">Мои цели</h1>
                 <p className="mt-1 text-sm text-gray-500">Все ваши цели в одном месте</p>
             </div>
 
-            {/* Stats cards */}
+
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
                 <div className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
                     <div className="text-2xl font-extrabold text-gray-900">{statsData.total}</div>
@@ -193,14 +192,14 @@ export const MyGoalsView = ({ onEditGoal }) => {
                 </div>
             </div>
 
-            {/* Warning if too few goals */}
+
             {goals.length > 0 && goals.length < 3 && (
                 <div className="mb-4 p-3 bg-orange-50 border border-orange-200 rounded-lg text-sm text-orange-800 font-medium">
                     {`У вас ${goals.length} цел${goals.length === 1 ? 'ь' : 'и'} — рекомендуется минимум 3 для полноценного набора.`}
                 </div>
             )}
 
-            {/* Toolbar */}
+
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
                 <SortToggle sortBy={sortBy} onToggle={setSortBy} />
                 {uniqueStatuses.length > 1 && (
@@ -212,7 +211,7 @@ export const MyGoalsView = ({ onEditGoal }) => {
                 )}
             </div>
 
-            {/* Goals list */}
+
             {loading ? (
                 <div className="space-y-4">
                     {[1, 2, 3, 4].map(i => <GoalCardSkeleton key={i} />)}
@@ -237,7 +236,7 @@ export const MyGoalsView = ({ onEditGoal }) => {
                 <div className="space-y-4">
                     {filteredGoals.map(goal => (
                         <div key={goal.id} className="relative">
-                            {/* Timestamp label */}
+
                             {(goal.updated_at || goal.created_at) && (
                                 <div className="absolute -top-2 right-4 z-10">
                                     <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white border border-gray-200 rounded-full text-[10px] text-gray-400 shadow-sm">
@@ -262,7 +261,7 @@ export const MyGoalsView = ({ onEditGoal }) => {
                 </div>
             )}
 
-            {/* Total count footer */}
+
             {!loading && filteredGoals.length > 0 && (
                 <div className="mt-4 text-center text-xs text-gray-400">
                     Показано {filteredGoals.length} из {goals.length} целей

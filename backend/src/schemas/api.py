@@ -4,7 +4,7 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
-# --- Goal Schemas ---
+
 class GoalCreate(BaseModel):
     goal_text: str = Field(..., description="Текст цели")
     metric: Optional[str] = Field(None, description="Ключ KPI-метрики из kpi_catalog (необязательно)")
@@ -41,7 +41,7 @@ class GoalResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-# --- AI Request Schemas ---
+
 class GoalEvaluateRequest(BaseModel):
     goal_text: str = Field(..., description="Текст цели для оценки")
     context: Optional[str] = Field(None, description="Контекст проекта/отдела для оценки релевантности")
@@ -57,7 +57,7 @@ class GoalGenerateRequest(BaseModel):
     year: int = Field(..., ge=2020)
 
 
-# --- Review Schemas ---
+
 class GoalReviewCreate(BaseModel):
     verdict: str = Field(
         ..., description="Вердикт: approve, reject, needs_changes, comment_only"
@@ -66,7 +66,7 @@ class GoalReviewCreate(BaseModel):
     reviewer_id: int = Field(..., description="ID руководителя-ревьюера")
 
 
-# --- Analytics Schemas ---
+
 class ChartDataPoint(BaseModel):
     name: str
     value: float

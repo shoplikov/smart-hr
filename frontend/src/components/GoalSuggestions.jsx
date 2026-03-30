@@ -87,7 +87,6 @@ export const GoalSuggestions = ({ onSelectGoal }) => {
             });
             setSuggestions(data);
         } catch {
-            // handled silently
         } finally {
             setLoading(false);
         }
@@ -97,7 +96,7 @@ export const GoalSuggestions = ({ onSelectGoal }) => {
 
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-clip">
-            {/* Header */}
+
             <div className="px-6 py-4 bg-gradient-to-r from-violet-50 to-indigo-50 border-b border-gray-200">
                 <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center text-violet-600">
@@ -110,7 +109,7 @@ export const GoalSuggestions = ({ onSelectGoal }) => {
                 </div>
             </div>
 
-            {/* Form */}
+
             <form onSubmit={handleGenerate} className="p-4 border-b border-gray-100">
                 <div className="grid grid-cols-2 gap-3 mb-3">
                     <div>
@@ -154,7 +153,7 @@ export const GoalSuggestions = ({ onSelectGoal }) => {
                 </button>
             </form>
 
-            {/* Results */}
+
             {suggestions && (
                 <div className="p-4">
                     {suggestions.strategic_alignment && (

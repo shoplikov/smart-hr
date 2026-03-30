@@ -11,7 +11,7 @@ export const UserPicker = () => {
 
     useEffect(() => {
         setLoading(true);
-        const isManagerFlag = loginMode === 'manager' ? true : false;
+        const isManagerFlag = loginMode === 'manager';
         api.getEmployees(null, isManagerFlag)
             .then(setEmployees)
             .catch((err) => console.error('Failed to load employees', err))

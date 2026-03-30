@@ -16,12 +16,10 @@ export const EmployeeView = () => {
     const [editingGoalId, setEditingGoalId] = useState(null);
     const [saveSuccess, setSaveSuccess] = useState(false);
 
-    // Fetch KPI catalog on mount
     useEffect(() => {
         api.getKpiCatalog().then(setKpiCatalog).catch(console.error);
     }, []);
 
-    // Listen for editGoal events from MyGoalsView
     useEffect(() => {
         const handler = (e) => {
             const goal = e.detail;
@@ -45,7 +43,6 @@ export const EmployeeView = () => {
             const result = await api.evaluateGoal(draftGoalText, user.employee.id);
             setEvaluation(result);
         } catch {
-            // handled silently
         } finally {
             setEvaluating(false);
         }
@@ -77,7 +74,6 @@ export const EmployeeView = () => {
             setSaveSuccess(true);
             setTimeout(() => setSaveSuccess(false), 3000);
         } catch {
-            // handled silently
         } finally {
             setSaving(false);
         }
@@ -106,7 +102,6 @@ export const EmployeeView = () => {
                 <p className="mt-1 text-sm text-gray-500">Планирование и оценка целей с помощью AI</p>
             </div>
 
-            {/* Success toast */}
             {saveSuccess && (
                 <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg text-sm text-green-800 font-medium flex items-center gap-2 animate-fade-in">
                     <svg className="w-4 h-4 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -117,10 +112,11 @@ export const EmployeeView = () => {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-                {/* Goal form */}
+
                 <div className="space-y-4">
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                        {/* Form header */}
+
+
                         <div className={`px-6 py-4 border-b border-gray-100 ${editingGoalId ? 'bg-gradient-to-r from-amber-50 to-orange-50' : 'bg-gradient-to-r from-indigo-50 to-blue-50'}`}>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2.5">
@@ -153,7 +149,7 @@ export const EmployeeView = () => {
                             </div>
                         </div>
 
-                        {/* Form body */}
+
                         <div className="p-5 space-y-4">
                             <div>
                                 <label className="block text-xs font-medium text-gray-500 mb-1.5">
@@ -204,7 +200,7 @@ export const EmployeeView = () => {
                             </div>
                         </div>
 
-                        {/* Form actions */}
+
                         <div className="px-5 py-4 bg-gray-50 border-t border-gray-100 flex gap-2.5">
                             <button
                                 onClick={handleEvaluate}

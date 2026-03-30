@@ -9,7 +9,6 @@ export const Dashboard = ({ departmentId }) => {
     const [availableMetrics, setAvailableMetrics] = useState([]);
     const [selectedMetric, setSelectedMetric] = useState('');
 
-    // Fetch KPI catalog on mount
     useEffect(() => {
         api.getKpiCatalog().then(items => {
             setAvailableMetrics(items);
@@ -36,8 +35,6 @@ export const Dashboard = ({ departmentId }) => {
     useEffect(() => {
         if (departmentId) fetchMetrics();
     }, [selectedMetric, departmentId, fetchMetrics]);
-
-
 
     return (
         <div className="bg-white shadow rounded-lg p-6 border border-gray-200 mb-8">

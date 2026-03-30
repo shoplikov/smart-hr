@@ -15,21 +15,20 @@ logger = logging.getLogger(__name__)
 class GoalGeneratorService:
     def __init__(self):
         self.client = AsyncOpenAI(api_key=settings.OPENAI_API_KEY)
-        self.model = (
-            "gpt-4o-mini"
-        )
+        self.model = "gpt-4o-mini"
 
     @observe()
     async def generate_goals(
         self, role: str, department: str, quarter: int, year: int
     ) -> GoalGenerationResult:
-        logger.info(f"Generating goals for {role} in {department} (Q{quarter} {year})")
+        logger.info("Generating goals for %s in %s (Q%d %d)", role, department, quarter, year)
 
         search_query = f"Стратегические цели, приоритеты и OKR для {department} на {quarter} квартал {year} года. Роль: {role}"
 
         context = await rag_service.search_relevant_context(
             query=search_query, department_scope=department, top_k=3
         )
+        logger.debug("RAG context retrieved: %d chars", len(context) if context else 0)
 
         context_block = (
             f"\nКорпоративный контекст (из базы знаний):\n{context}"
@@ -48,6 +47,7 @@ class GoalGeneratorService:
             context_block=context_block,
         )
 
+        logger.debug("Calling OpenAI %s for goal generation", self.model)
         response = await self.client.chat.completions.create(
             model=self.model,
             messages=[
@@ -58,9 +58,16 @@ class GoalGeneratorService:
             temperature=0.6,
         )
 
-        return GoalGenerationResult.model_validate_json(
+        result = GoalGenerationResult.model_validate_json(
             response.choices[0].message.content
         )
+        logger.info(
+            "Goal generation completed: %d goals generated (tokens: prompt=%s completion=%s)",
+            len(result.goals) if hasattr(result, 'goals') else 0,
+            getattr(response.usage, 'prompt_tokens', '?'),
+            getattr(response.usage, 'completion_tokens', '?'),
+        )
+        return result
 
 
 goal_generator = GoalGeneratorService()

@@ -158,7 +158,6 @@ export const GoalCard = ({
             const result = await api.runAndSaveEvaluation(goal.id);
             setEvaluation(result);
         } catch {
-            // handled by toast at parent level
         } finally {
             setEvalLoading(false);
         }
@@ -180,7 +179,8 @@ export const GoalCard = ({
         <div className={`bg-white rounded-xl border transition-shadow hover:shadow-md ${
             needsAttention ? 'border-orange-300 ring-1 ring-orange-200' : 'border-gray-200'
         }`}>
-            {/* Header */}
+
+
             <div className="p-5">
                 <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -213,7 +213,7 @@ export const GoalCard = ({
                         </div>
                     </div>
 
-                    {/* Actions */}
+
                     <div className="flex flex-col gap-1.5 shrink-0">
                         {mode === 'employee' && !isLocked && (
                             <>
@@ -243,7 +243,7 @@ export const GoalCard = ({
                 </div>
             </div>
 
-            {/* Expandable sections */}
+
             <div className="px-5 pb-4 space-y-2">
                 <Expandable
                     title="SMART-анализ ИИ"
@@ -275,7 +275,7 @@ export const GoalCard = ({
                 </Expandable>
             </div>
 
-            {/* Inline review form (manager mode) */}
+
             {reviewForm && (
                 <div className="border-t border-gray-200 p-5 bg-gray-50/50 rounded-b-xl">
                     {reviewForm}

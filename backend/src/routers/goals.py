@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import uuid
+from datetime import date as date_type
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -105,6 +106,12 @@ async def _create_event(
         new_text=new_text,
     )
     db.add(event)
+    logger.debug(
+        "Event recorded: type=%s goal_id=%s actor=%s old_status=%s new_status=%s",
+        event_type.value, goal_id, actor_id,
+        old_status.value if old_status else None,
+        new_status.value if new_status else None,
+    )
 
 
 async def _get_goal_context(
@@ -115,14 +122,12 @@ async def _get_goal_context(
 ) -> str:
     parts = []
 
-    # 1. Start with goal object if provided, else fetch it
     if not goal_obj and goal_id:
         goal_obj = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
 
     if goal_obj and not employee_id:
         employee_id = goal_obj.employee_id
 
-    # 1a. Fetch employee's role/position — essential for relevant evaluations
     if employee_id:
         emp_result = await db.execute(
             select(Employee).where(Employee.id == employee_id).options(selectinload(Employee.position))
@@ -134,21 +139,17 @@ async def _get_goal_context(
                 role_str += f" ({emp.position.grade})"
             parts.append(f"Должность сотрудника: {role_str}")
 
-    # 1b. If goal has a KPI metric, include it in context
     if goal_obj and goal_obj.metric:
         kpi = await db.get(KpiCatalog, goal_obj.metric)
         if kpi:
             parts.append(f"KPI-метрика цели: {kpi.title} ({kpi.metric_key}, единица: {kpi.unit}). {kpi.description or ''}")
 
-    # 2. Extract context from the linked project if any
-    if goal_obj:
-        if goal_obj.project_id:
-            project = await db.get(Project, goal_obj.project_id)
-            if project:
-                parts.append(f"Проект: {project.name}. Описание: {project.description or 'Нет описания'}")
-                return "\n".join(parts) if parts else "Общий корпоративный контекст"
+    if goal_obj and goal_obj.project_id:
+        project = await db.get(Project, goal_obj.project_id)
+        if project:
+            parts.append(f"Проект: {project.name}. Описание: {project.description or 'Нет описания'}")
+            return "\n".join(parts) if parts else "Общий корпоративный контекст"
 
-    # 3. If we have an employee_id, look up all their assigned projects
     if employee_id:
         query = (
             select(Project)
@@ -161,10 +162,9 @@ async def _get_goal_context(
             proj_list = "\n".join([f"- {p.name}: {p.description or 'Без описания'}" for p in projects])
             parts.append(f"Проекты сотрудника:\n{proj_list}")
             ctx = "\n".join(parts)
-            logger.info(f"Retrieved employee context: {ctx[:300]}...")
+            logger.debug("Retrieved employee context: %s", ctx[:300])
             return ctx
 
-        # 4. Fallback to department if projects are still not found
         dept_id = goal_obj.department_id if goal_obj else None
         if dept_id:
             dept = await db.get(Department, dept_id)
@@ -175,16 +175,28 @@ async def _get_goal_context(
     return "\n".join(parts) if parts else "Общий корпоративный контекст"
 
 
-# --- AI Endpoints ---
+
 @router.post("/ai/generate")
 async def generate_goals(request: GoalGenerateRequest):
-    result = await goal_generator.generate_goals(
-        role=request.role,
-        department=request.department,
-        quarter=request.quarter,
-        year=request.year,
+    logger.info(
+        "AI goal generation requested: role=%s department=%s quarter=Q%s year=%s",
+        request.role, request.department, request.quarter, request.year,
     )
-    return result
+    try:
+        result = await goal_generator.generate_goals(
+            role=request.role,
+            department=request.department,
+            quarter=request.quarter,
+            year=request.year,
+        )
+        logger.info(
+            "AI goal generation completed: %d goals generated",
+            len(result.goals) if hasattr(result, 'goals') else 0,
+        )
+        return result
+    except Exception:
+        logger.exception("AI goal generation failed for role=%s department=%s", request.role, request.department)
+        raise
 
 
 @router.post("/ai/evaluate")
@@ -192,32 +204,47 @@ async def evaluate_goal_endpoint(
     request: GoalEvaluateRequest,
     db: AsyncSession = Depends(get_db)
 ):
-    # Determine context: explicit, or dynamic from employee
+    logger.info(
+        "AI SMART evaluation requested: goal_text='%s' employee_id=%s has_explicit_context=%s",
+        request.goal_text[:80], request.employee_id, bool(request.context),
+    )
+
     context = request.context
     if not context and request.employee_id:
         context = await _get_goal_context(db, employee_id=request.employee_id)
+        logger.debug("Dynamic context resolved for employee_id=%s: '%s'", request.employee_id, context[:200])
     
-    logger.info(f"Final evaluation context for goal evaluation endpoint: {context or 'default'}")
-    
-    result = await smart_evaluator.evaluate_goal(
-        goal_text=request.goal_text,
-        context=context or "Общий корпоративный контекст"
-    )
-    return result
+    try:
+        result = await smart_evaluator.evaluate_goal(
+            goal_text=request.goal_text,
+            context=context or "Общий корпоративный контекст"
+        )
+        logger.info(
+            "AI SMART evaluation completed: smart_index=%.2f",
+            result.smart_index,
+        )
+        return result
+    except Exception:
+        logger.exception("AI SMART evaluation failed for goal_text='%s'", request.goal_text[:80])
+        raise
 
 
 @router.get("/ai/evaluate-batch/{employee_id}")
 async def batch_evaluate_goals(
     employee_id: int, db: AsyncSession = Depends(get_db)
 ):
+    logger.info("Batch SMART evaluation requested: employee_id=%s", employee_id)
     query = select(Goal).where(Goal.employee_id == employee_id)
     result = await db.execute(query)
     goals = result.scalars().all()
 
     if not goals:
+        logger.warning("Batch evaluation: no goals found for employee_id=%s", employee_id)
         raise HTTPException(status_code=404, detail="No goals found for this employee")
 
-    # Fetch project/department info for context
+    logger.info("Batch evaluation: evaluating %d goals for employee_id=%s", len(goals), employee_id)
+
+
     eval_tasks = []
     for g in goals:
         context = await _get_goal_context(db, goal_obj=g)
@@ -246,6 +273,11 @@ async def batch_evaluate_goals(
     criteria_avg = {k: round(v / n, 2) for k, v in criteria_sums.items()} if n else {}
     weakest = sorted(criteria_avg.items(), key=lambda x: x[1])
 
+    logger.info(
+        "Batch evaluation completed: employee_id=%s goals=%d avg_smart_index=%.2f",
+        employee_id, n, avg_index,
+    )
+
     return {
         "employee_id": employee_id,
         "total_goals": n,
@@ -258,17 +290,19 @@ async def batch_evaluate_goals(
     }
 
 
-# --- Evaluation Persistence Endpoints ---
+
 @router.post("/{goal_id}/evaluations")
 async def create_evaluation(
     goal_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
 ):
+    logger.info("Creating persisted evaluation: goal_id=%s", goal_id)
     goal = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
     if not goal:
+        logger.warning("Evaluation creation failed: goal_id=%s not found", goal_id)
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    # Fetch context (Project description or Department)
+
     context = await _get_goal_context(db, goal_obj=goal)
     result = await smart_evaluator.evaluate_goal(goal_text=goal.goal_text, context=context)
     scores_dict = result.smart_scores.model_dump() if result.smart_scores else {}
@@ -283,6 +317,11 @@ async def create_evaluation(
     db.add(evaluation)
     await db.commit()
     await db.refresh(evaluation)
+
+    logger.info(
+        "Evaluation persisted: id=%s goal_id=%s smart_index=%.2f",
+        evaluation.id, goal_id, float(evaluation.smart_index) if evaluation.smart_index else 0,
+    )
 
     return {
         "id": str(evaluation.id),
@@ -323,15 +362,20 @@ async def get_latest_evaluation(
     }
 
 
-# --- Review Endpoints ---
+
 @router.post("/{goal_id}/reviews")
 async def create_review(
     goal_id: uuid.UUID,
     review: GoalReviewCreate,
     db: AsyncSession = Depends(get_db),
 ):
+    logger.info(
+        "Review submission: goal_id=%s reviewer_id=%s verdict=%s",
+        goal_id, review.reviewer_id, review.verdict,
+    )
     goal = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
     if not goal:
+        logger.warning("Review failed: goal_id=%s not found", goal_id)
         raise HTTPException(status_code=404, detail="Goal not found")
 
     verdict_enum = ReviewVerdictEnum(review.verdict)
@@ -347,6 +391,10 @@ async def create_review(
     new_status = VERDICT_TO_STATUS.get(verdict_enum)
     if new_status and goal.status != new_status:
         goal.status = new_status
+        logger.info(
+            "Goal status transition: goal_id=%s %s -> %s (triggered by review verdict=%s)",
+            goal_id, old_status.value, new_status.value, verdict_enum.value,
+        )
 
     event_type = {
         ReviewVerdictEnum.approve: GoalEventTypeEnum.approved,
@@ -418,18 +466,22 @@ async def get_events(goal_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
     ]
 
 
-# --- CRUD Endpoints ---
+
 @router.post("/", response_model=GoalResponse)
 async def create_goal(goal: GoalCreate, db: AsyncSession = Depends(get_db)):
+    logger.info(
+        "Creating goal: employee_id=%s department_id=%s metric=%s quarter=Q%s year=%s",
+        goal.employee_id, goal.department_id, goal.metric, goal.quarter, goal.year,
+    )
     kpi_title = await _validate_metric(db, goal.metric)
     q_enum = getattr(QuarterEnum, f"Q{goal.quarter}", QuarterEnum.Q1)
 
-    from datetime import date as date_type
     deadline_val = None
     if goal.deadline:
         try:
             deadline_val = date_type.fromisoformat(goal.deadline)
         except ValueError:
+            logger.warning("Invalid deadline format: '%s'", goal.deadline)
             raise HTTPException(status_code=400, detail="Неверный формат дедлайна. Используйте YYYY-MM-DD")
 
     new_goal = Goal(
@@ -454,11 +506,13 @@ async def create_goal(goal: GoalCreate, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
     await db.refresh(new_goal)
+    logger.info("Goal created: id=%s employee_id=%s", new_goal.goal_id, goal.employee_id)
     return _goal_to_dict(new_goal, kpi_title=kpi_title)
 
 
 @router.get("/employee/{employee_id}", response_model=List[GoalResponse])
 async def get_employee_goals(employee_id: int, db: AsyncSession = Depends(get_db)):
+    logger.debug("Fetching goals for employee_id=%s", employee_id)
     query = (
         select(Goal)
         .where(Goal.employee_id == employee_id)
@@ -466,8 +520,9 @@ async def get_employee_goals(employee_id: int, db: AsyncSession = Depends(get_db
     )
     result = await db.execute(query)
     goals = result.scalars().all()
+    logger.info("Fetched %d goals for employee_id=%s", len(goals), employee_id)
 
-    # Batch-fetch KPI titles for all goals that have a metric
+
     metric_keys = {g.metric for g in goals if g.metric}
     kpi_titles = {}
     if metric_keys:
@@ -486,14 +541,17 @@ async def update_goal_status(
     status_update: GoalStatusUpdate,
     db: AsyncSession = Depends(get_db),
 ):
+    logger.info("Status update requested: goal_id=%s new_status=%s", goal_id, status_update.status)
     db_status = status_update.status.lower()
     goal = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
 
     if not goal:
+        logger.warning("Status update failed: goal_id=%s not found", goal_id)
         raise HTTPException(status_code=404, detail="Goal not found")
 
     old_status = goal.status
     goal.status = db_status
+    logger.info("Goal status changed: goal_id=%s %s -> %s", goal_id, old_status.value, db_status)
 
     await _create_event(
         db, goal_id, GoalEventTypeEnum.status_changed,
@@ -510,21 +568,24 @@ async def update_goal_status(
 async def update_goal(
     goal_id: uuid.UUID, goal_update: GoalUpdate, db: AsyncSession = Depends(get_db)
 ):
+    logger.info("Updating goal: goal_id=%s", goal_id)
     kpi_title = await _validate_metric(db, goal_update.metric)
 
     goal = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
 
     if not goal:
+        logger.warning("Update failed: goal_id=%s not found", goal_id)
         raise HTTPException(status_code=404, detail="Goal not found")
     if goal.status in LOCKED_STATUSES:
+        logger.warning("Update blocked: goal_id=%s has locked status=%s", goal_id, goal.status.value)
         raise HTTPException(status_code=400, detail="Cannot edit a goal with this status.")
 
-    from datetime import date as date_type
     deadline_val = None
     if goal_update.deadline:
         try:
             deadline_val = date_type.fromisoformat(goal_update.deadline)
         except ValueError:
+            logger.warning("Invalid deadline format on update: '%s'", goal_update.deadline)
             raise HTTPException(status_code=400, detail="Неверный формат дедлайна. Используйте YYYY-MM-DD")
 
     old_text = goal.goal_text
@@ -541,18 +602,23 @@ async def update_goal(
 
     await db.commit()
     await db.refresh(goal)
+    logger.info("Goal updated: goal_id=%s", goal_id)
     return _goal_to_dict(goal, kpi_title=kpi_title)
 
 
 @router.delete("/{goal_id}", status_code=204)
 async def delete_goal(goal_id: uuid.UUID, db: AsyncSession = Depends(get_db)):
+    logger.info("Delete requested: goal_id=%s", goal_id)
     goal = (await db.execute(select(Goal).where(Goal.goal_id == goal_id))).scalars().first()
 
     if not goal:
+        logger.warning("Delete failed: goal_id=%s not found", goal_id)
         raise HTTPException(status_code=404, detail="Goal not found")
     if goal.status in LOCKED_STATUSES:
+        logger.warning("Delete blocked: goal_id=%s has locked status=%s", goal_id, goal.status.value)
         raise HTTPException(status_code=400, detail="Cannot delete a goal with this status.")
 
     await db.delete(goal)
     await db.commit()
+    logger.info("Goal deleted: goal_id=%s employee_id=%s", goal_id, goal.employee_id)
     return None

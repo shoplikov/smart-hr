@@ -1,8 +1,11 @@
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from src.core.database import get_db
 from src.models.schema import Department, Employee, Position
@@ -16,6 +19,7 @@ async def list_employees(
     is_manager: Optional[bool] = None,
     db: AsyncSession = Depends(get_db),
 ):
+    logger.info("Listing employees: manager_id=%s is_manager=%s", manager_id, is_manager)
     query = (
         select(
             Employee.id,
@@ -43,6 +47,7 @@ async def list_employees(
     query = query.order_by(Department.name, Employee.full_name)
     result = await db.execute(query)
     rows = result.all()
+    logger.info("Returned %d employees", len(rows))
 
     return [
         {
@@ -61,6 +66,7 @@ async def list_employees(
 
 @router.get("/departments")
 async def list_departments(db: AsyncSession = Depends(get_db)):
+    logger.debug("Fetching active departments")
     query = (
         select(Department)
         .where(Department.is_active.is_(True))
@@ -68,6 +74,7 @@ async def list_departments(db: AsyncSession = Depends(get_db)):
     )
     result = await db.execute(query)
     departments = result.scalars().all()
+    logger.info("Returned %d departments", len(departments))
 
     return [
         {

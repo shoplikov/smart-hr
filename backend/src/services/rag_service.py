@@ -92,6 +92,7 @@ class RAGService:
         self, query: str, top_k: int = 3, department_scope: str = None
     ) -> str:
         """Returns formatted context chunks with document titles for RAG citation."""
+        logger.debug("RAG search: query='%s' top_k=%d department_scope=%s", query[:100], top_k, department_scope)
         query_embedding = await self._generate_embeddings([query])
 
         results = await asyncio.to_thread(
@@ -102,6 +103,7 @@ class RAGService:
         )
 
         if not results["documents"] or not results["documents"][0]:
+            logger.info("RAG search returned no results for query='%s'", query[:100])
             return ""
 
         chunks = []
@@ -111,6 +113,11 @@ class RAGService:
             title = metadata.get("title", "Неизвестный документ")
             chunks.append(f"[Документ: {title}]\n{doc_text}")
 
+        logger.info(
+            "RAG search returned %d chunks: [%s]",
+            len(chunks),
+            ", ".join(m.get("title", "?") for m in results["metadatas"][0]),
+        )
         return "\n---\n".join(chunks)
 
 

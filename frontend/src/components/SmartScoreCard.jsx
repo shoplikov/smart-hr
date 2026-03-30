@@ -66,7 +66,7 @@ export const SmartScoreCard = ({ evaluation, onApplyReformulation }) => {
 
     return (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-            {/* Header with score ring */}
+
             <div className="p-5 flex items-center gap-5 border-b border-gray-100">
                 <ScoreRing score={smart_index} />
                 <div className="flex-1">
@@ -93,7 +93,7 @@ export const SmartScoreCard = ({ evaluation, onApplyReformulation }) => {
                 </div>
             </div>
 
-            {/* Criteria bars */}
+
             {smart_scores && (
                 <div className="p-5 space-y-3 border-b border-gray-100">
                     {Object.entries(CRITERIA_LABELS).map(([key, { short, full }]) => (
@@ -102,7 +102,7 @@ export const SmartScoreCard = ({ evaluation, onApplyReformulation }) => {
                 </div>
             )}
 
-            {/* Recommendations */}
+
             {recommendations && recommendations.length > 0 && (
                 <div className="p-5 border-b border-gray-100">
                     <div className="flex items-center gap-2 mb-3">
@@ -124,7 +124,7 @@ export const SmartScoreCard = ({ evaluation, onApplyReformulation }) => {
                 </div>
             )}
 
-            {/* Improved goal */}
+
             {improved_goal && (
                 <div className="p-5">
                     <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200/60">

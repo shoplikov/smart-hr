@@ -274,7 +274,6 @@ export const ManagerView = () => {
             const result = await api.batchEvaluateGoals(selectedSubId);
             setBatchResult(result);
         } catch {
-            // error handled silently
         } finally {
             setBatchLoading(false);
         }
@@ -291,7 +290,6 @@ export const ManagerView = () => {
             setReviewingGoalId(null);
             await fetchTeamGoals(selectedSubId);
         } catch {
-            // error handled silently
         } finally {
             setReviewSubmitting(false);
         }
